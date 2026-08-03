@@ -15,6 +15,15 @@ const dirname = import.meta.dirname;
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
+	optimizeDeps: {
+		// `storybook/test` reaches @testing-library/dom through a deep import, so Vite never
+		// sees a bare specifier for it and leaves it un-prebundled. Its CJS dependency tree —
+		// aria-query, lz-string, dom-accessibility-api, pretty-format — is then served to the
+		// browser as raw CommonJS, and every story file dies during setup on
+		// `does not provide an export named 'elementRoles'` before a single test runs.
+		// Naming the parent is enough; the optimizer pulls the whole tree in with it.
+		include: ['@testing-library/dom', 'storybook/test']
+	},
 	test: {
 		projects: [
 			// Plain node tests: money arithmetic, tenancy, entitlement, audit, registry

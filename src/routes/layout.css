@@ -2,147 +2,553 @@
 @import 'tw-animate-css';
 @import 'shadcn-svelte/tailwind.css';
 @import '@fontsource-variable/inter';
-/*
- ---break---
- */
-@custom-variant dark (&:is(.dark *));
+@import '@fontsource-variable/jetbrains-mono';
+
 @plugin '@tailwindcss/typography';
 
 /*
  * @tailwindcss/forms was removed deliberately. It globally restyles inputs, selects and
  * checkboxes, and is a well-known source of double borders and broken focus rings under
  * shadcn-svelte — which owns form control styling here.
- *
- * shadcn-svelte's design tokens are appended below this line by `shadcn-svelte init`.
  */
+
 /*
- ---break---
+ * ---------------------------------------------------------------------------------------
+ * THEME SWITCHING
+ * ---------------------------------------------------------------------------------------
+ * Dark is the product, not a variant of it: the token block below lives on `:root` and is
+ * what renders with no JavaScript, no localStorage and no class on <html>. Light is a
+ * derivation, applied by adding `.light`.
+ *
+ * `mode-watcher` is configured in `+layout.svelte` with `defaultMode="dark"` and
+ * `lightClassNames={['light']}`, so an explicit user choice of light adds `.light` in a
+ * blocking <head> script — before first paint, so there is no flash. `.dark` is still
+ * added in dark mode purely so third-party `dark:` utilities keep working.
+ *
+ * The `dark` variant therefore keys off the ABSENCE of `.light`, not the presence of
+ * `.dark`. Keying off `.dark` would silently fall back to light styling for any user
+ * without JavaScript, which is exactly backwards.
+ */
+@custom-variant dark (&:where(:root:not(.light), :root:not(.light) *));
+
+/*
+ * ---------------------------------------------------------------------------------------
+ * TOKENS — DARK (default)
+ * ---------------------------------------------------------------------------------------
+ * Depth comes from layered surfaces, not shadow. Every value below is quoted from the
+ * design; nothing here is invented except where a comment says so.
  */
 :root {
-	--background: oklch(1 0 0);
-	--foreground: oklch(0.145 0 0);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.145 0 0);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.145 0 0);
-	--primary: oklch(0.205 0 0);
-	--primary-foreground: oklch(0.985 0 0);
-	--secondary: oklch(0.97 0 0);
-	--secondary-foreground: oklch(0.205 0 0);
-	--muted: oklch(0.97 0 0);
-	--muted-foreground: oklch(0.556 0 0);
-	--accent: oklch(0.97 0 0);
-	--accent-foreground: oklch(0.205 0 0);
-	--destructive: oklch(0.577 0.245 27.325);
-	--border: oklch(0.922 0 0);
-	--input: oklch(0.922 0 0);
-	--ring: oklch(0.708 0 0);
-	--chart-1: oklch(0.87 0 0);
-	--chart-2: oklch(0.556 0 0);
-	--chart-3: oklch(0.439 0 0);
-	--chart-4: oklch(0.371 0 0);
-	--chart-5: oklch(0.269 0 0);
-	--radius: 0.625rem;
-	--sidebar: oklch(0.985 0 0);
-	--sidebar-foreground: oklch(0.145 0 0);
-	--sidebar-primary: oklch(0.205 0 0);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.97 0 0);
-	--sidebar-accent-foreground: oklch(0.205 0 0);
-	--sidebar-border: oklch(0.922 0 0);
-	--sidebar-ring: oklch(0.708 0 0);
+	color-scheme: dark;
+
+	/* Surfaces — each layer sits visually above the one before it. */
+	--surface-base: #0e0f12; /* Page background, top bar */
+	--surface-sunken: #131417; /* Sidebar, preview gutters, sticky footers */
+	--surface-card: #1b1d22; /* Cards, table rows, inputs */
+	--surface-raised: #292c33; /* Active nav row, selected chip, module rows */
+	--surface-overlay: #23262c; /* Dialogs, toasts */
+	--surface-quiet: #24272d; /* Draft badge fill — the quietest filled surface */
+
+	/* Borders — ascending prominence. */
+	--border-row: #24272d; /* Table row separators */
+	--border-subtle: #292c33; /* Section dividers, shell seams */
+	--border-default: #2d3037; /* Card and table outlines */
+	--border-control: #33363e; /* Inputs, quiet chips */
+	--border-strong: #3e4149; /* Overlay edges, secondary buttons */
+	--border-hover: #4c4f58; /* Secondary button hover */
+
+	/*
+	 * Text. `--text-muted` is the contrast floor — no text goes quieter.
+	 *
+	 * The design uses #7D7F88 for nearly all 12px helper text, which measures 4.22:1 on
+	 * --surface-card: below WCAG AA and below the design's own stated 4.6:1 floor. Helper
+	 * text maps to --text-muted (#96989F, 5.85:1 on card) instead. #7D7F88 survives only
+	 * as --decoration-quiet, whose name makes it unusable on a glyph.
+	 */
+	--text-primary: #f2f3f5;
+	--text-strong-secondary: #d6d8de; /* Inactive-but-present rows */
+	--text-secondary: #adafb8; /* Supporting prose */
+	--text-muted: #96989f; /* Labels, eyebrows, helper text, timestamps */
+	--decoration-quiet: #7d7f88; /* NEVER a glyph. Rules, ticks, inert marks only. */
+
+	/*
+	 * BRAND. Per-tenant overridable — see the [data-brand] block below.
+	 *
+	 * The design states #5B6CFF for the fill and white for the label. Those two together
+	 * measure 4.17:1, under AA and under the design's own 4.6:1 floor, and the same is true
+	 * of the other three palette options (3.74:1 to 4.50:1). Since the design demands the
+	 * floor, the pair has to move; the fill is what moved, by the smallest amount that
+	 * clears it, so the tenant's colour is still recognisably the tenant's colour.
+	 *
+	 *   #5B6CFF -> #5464EE   white 4.74:1
+	 *
+	 * Which is also why hover DEEPENS rather than lightens: any lighter and white fails
+	 * again. Both themes deepen, which reads the same way in each.
+	 */
+	--brand: #5464ee; /* Primary action fill */
+	--brand-hover: color-mix(in oklab, var(--brand) 92%, black);
+	--brand-active: color-mix(in oklab, var(--brand) 84%, black);
+	--brand-ring-soft: color-mix(in srgb, var(--brand) 28%, transparent); /* input focus */
+	--brand-tint: color-mix(in srgb, var(--brand) 15%, transparent);
+	/* 2px outline, 2px offset. A light ring, because it sits on a dark ground. */
+	--brand-focus-ring: color-mix(in oklab, var(--brand) 55%, white);
+	/*
+	 * Brand as TEXT. The fill is tuned to carry white, which makes it too dark to BE text:
+	 * 3.6:1 on --surface-card. Brand-coloured labels ("Resume", "Add") use this instead,
+	 * lifted until it clears 4.6:1 on every surface. Fills, rules and icons keep --brand.
+	 */
+	--brand-ink: color-mix(in oklab, var(--brand) 66%, white);
+	/*
+	 * Text on a --brand fill. White, as designed — the fill is what was adjusted to earn
+	 * it. Named separately so it stays a single point of change.
+	 */
+	--text-on-brand: #ffffff;
+
+	/* Semantic state. Pill backgrounds are the same colour at 15% alpha. */
+	--state-settled: #35b37e; /* Paid, all-clear, matched */
+	--state-attention: #e0a93c; /* Due soon, variance */
+	--state-wrong: #e0685c; /* Overdue, destructive, validation */
+	--state-settled-tint: color-mix(in srgb, var(--state-settled) 15%, transparent);
+	--state-attention-tint: color-mix(in srgb, var(--state-attention) 15%, transparent);
+	--state-wrong-tint: color-mix(in srgb, var(--state-wrong) 15%, transparent);
+	--state-wrong-border: #8a4a3f; /* Invalid input outline */
+	--state-wrong-border-quiet: #6e3b33; /* Destructive button outline */
+
+	/*
+	 * INK ON A TINT.
+	 *
+	 * A tinted pill moves its own background toward its own colour, which eats the very
+	 * contrast the colour was providing: --state-wrong on a 15% wrong tint measures 4.16:1,
+	 * and every module accent lands between 4.2 and 4.4 the same way. So a badge draws its
+	 * text from the -ink token, never from the colour it is tinted with.
+	 *
+	 * One ratio for the whole family in each theme — 72% toward white in dark, 88% toward
+	 * black in light — so a new accent needs no new decision. Every one clears 4.6:1 both
+	 * on its own tint and on bare surface. --brand-ink is the exception at 66% / 84%: the
+	 * brand fill is darker than these, so its ink has to travel further to clear the same
+	 * bar on --brand-tint.
+	 */
+	--state-settled-ink: color-mix(in oklab, var(--state-settled) 72%, white);
+	--state-attention-ink: color-mix(in oklab, var(--state-attention) 72%, white);
+	--state-wrong-ink: color-mix(in oklab, var(--state-wrong) 72%, white);
+
+	/*
+	 * Module accents — wayfinding only, never fields of colour. Fixed across all tenants
+	 * and unaffected by the brand override, so a client's colour cannot collide with the
+	 * meaning of a module. Tint background is the accent at 18% alpha.
+	 */
+	--accent-quoting: #6e8cf0;
+	--accent-invoicing: #3fb3a8;
+	--accent-inventory: #d9a445;
+	--accent-payroll: #a177e8;
+	--accent-expenses: #e07a6e;
+	--accent-bookings: #56b57e;
+	--accent-home: #9a9ca4; /* Neutral — Home is not a module */
+	--accent-quoting-tint: color-mix(in srgb, var(--accent-quoting) 18%, transparent);
+	--accent-invoicing-tint: color-mix(in srgb, var(--accent-invoicing) 18%, transparent);
+	--accent-inventory-tint: color-mix(in srgb, var(--accent-inventory) 18%, transparent);
+	--accent-payroll-tint: color-mix(in srgb, var(--accent-payroll) 18%, transparent);
+	--accent-expenses-tint: color-mix(in srgb, var(--accent-expenses) 18%, transparent);
+	--accent-bookings-tint: color-mix(in srgb, var(--accent-bookings) 18%, transparent);
+	--accent-home-tint: color-mix(in srgb, var(--accent-home) 18%, transparent);
+	--accent-quoting-ink: color-mix(in oklab, var(--accent-quoting) 72%, white);
+	--accent-invoicing-ink: color-mix(in oklab, var(--accent-invoicing) 72%, white);
+	--accent-inventory-ink: color-mix(in oklab, var(--accent-inventory) 72%, white);
+	--accent-payroll-ink: color-mix(in oklab, var(--accent-payroll) 72%, white);
+	--accent-expenses-ink: color-mix(in oklab, var(--accent-expenses) 72%, white);
+	--accent-bookings-ink: color-mix(in oklab, var(--accent-bookings) 72%, white);
+	--accent-home-ink: color-mix(in oklab, var(--accent-home) 72%, white);
+
+	/*
+	 * Paper — the document the client receives. Declared once, never overridden by
+	 * `.light`, so a quote preview looks identical in both themes. Values from T17.
+	 */
+	--paper-bg: #fbfbf9; /* Sheet */
+	--paper-ink: #1a1a1a; /* Primary text */
+	/*
+	 * T17 states #7A7A76, which measures 4.16:1 on the sheet — under AA and under the
+	 * design's own floor. Lifted for the same reason T01 lifted #7D7F88: this one carries
+	 * the labels on a document a customer reads and SARS may inspect. 4.94:1.
+	 */
+	--paper-ink-muted: #6e6e6a; /* Labels, footnotes */
+	--paper-rule: #e4e2dc; /* Section rules */
+	--paper-rule-light: #efede7; /* Line-item rules */
+
+	/* Radius. Controls 8, cards 12, dialogs and shell frames 14. */
+	--radius: 0.5rem;
+	--radius-control: 8px;
+	--radius-card: 12px;
+	--radius-dialog: 14px;
+
+	/* Motion — 150-200ms, ease-out, forward only. */
+	--motion-fast: 150ms;
+	--motion-base: 200ms;
+	--motion-ease: cubic-bezier(0.2, 0, 0, 1);
 }
+
 /*
- ---break---
+ * ---------------------------------------------------------------------------------------
+ * TOKENS — LIGHT (derived)
+ * ---------------------------------------------------------------------------------------
+ * The design states four values: base #FBFBFA, card #FFFFFF, borders #E7E6E3, text
+ * #1A1A1C. Everything else is derived to hold the same shape as dark — the same number of
+ * layers, the same ascending border ramp, the same four-step text ramp — and every text
+ * and accent token here clears 4.6:1 on every surface it can land on. Module accents move
+ * to full saturation because the dark values are tuned for a dark ground and wash out on
+ * white. `src/lib/components/theme/token-contrast.test.ts` measures all of it, both themes,
+ * every surface — it reads this file rather than a copy of the palette.
+ *
+ * `.light` and `:root` have equal specificity and both match <html>, so this block MUST
+ * stay below the one above.
  */
-.dark {
-	--background: oklch(0.145 0 0);
-	--foreground: oklch(0.985 0 0);
-	--card: oklch(0.205 0 0);
-	--card-foreground: oklch(0.985 0 0);
-	--popover: oklch(0.205 0 0);
-	--popover-foreground: oklch(0.985 0 0);
-	--primary: oklch(0.922 0 0);
-	--primary-foreground: oklch(0.205 0 0);
-	--secondary: oklch(0.269 0 0);
-	--secondary-foreground: oklch(0.985 0 0);
-	--muted: oklch(0.269 0 0);
-	--muted-foreground: oklch(0.708 0 0);
-	--accent: oklch(0.269 0 0);
-	--accent-foreground: oklch(0.985 0 0);
-	--destructive: oklch(0.704 0.191 22.216);
-	--border: oklch(1 0 0 / 10%);
-	--input: oklch(1 0 0 / 15%);
-	--ring: oklch(0.556 0 0);
-	--chart-1: oklch(0.87 0 0);
-	--chart-2: oklch(0.556 0 0);
-	--chart-3: oklch(0.439 0 0);
-	--chart-4: oklch(0.371 0 0);
-	--chart-5: oklch(0.269 0 0);
-	--sidebar: oklch(0.205 0 0);
-	--sidebar-foreground: oklch(0.985 0 0);
-	--sidebar-primary: oklch(0.488 0.243 264.376);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.269 0 0);
-	--sidebar-accent-foreground: oklch(0.985 0 0);
-	--sidebar-border: oklch(1 0 0 / 10%);
-	--sidebar-ring: oklch(0.556 0 0);
+.light {
+	color-scheme: light;
+
+	--surface-base: #fbfbfa;
+	--surface-sunken: #f4f3f1;
+	--surface-card: #ffffff;
+	--surface-raised: #eeece8;
+	--surface-overlay: #ffffff; /* Card is already white; the edge does the lifting */
+	--surface-quiet: #f2f0ec;
+
+	--border-row: #f0eeea;
+	--border-subtle: #edebe7;
+	--border-default: #e7e6e3;
+	--border-control: #d9d7d2;
+	--border-strong: #c4c2bb;
+	--border-hover: #a5a39c;
+
+	--text-primary: #1a1a1c;
+	--text-strong-secondary: #35363a;
+	--text-secondary: #54565c;
+	--text-muted: #65676e;
+	--decoration-quiet: #9a9ba1;
+
+	/*
+	 * --brand is the tenant's colour and does not shift between themes, and neither do
+	 * hover and active — both deepen in either theme. Only the two that depend on what is
+	 * BEHIND them change: a pale ring is invisible on white, and brand-as-text has to
+	 * darken rather than lighten.
+	 */
+	--brand-focus-ring: var(--brand-hover);
+	--brand-ink: color-mix(in oklab, var(--brand) 84%, black);
+
+	--state-settled: #136b48;
+	--state-attention: #7f580b;
+	--state-wrong: #b83227;
+	--state-wrong-border: #c1655c;
+	--state-wrong-border-quiet: #d69b94;
+
+	/* Same idea as dark, mirrored: a tint on white darkens, so ink on it has to darken too. */
+	--state-settled-ink: color-mix(in oklab, var(--state-settled) 88%, black);
+	--state-attention-ink: color-mix(in oklab, var(--state-attention) 88%, black);
+	--state-wrong-ink: color-mix(in oklab, var(--state-wrong) 88%, black);
+
+	--accent-quoting: #3b5bdb;
+	--accent-invoicing: #0a7269;
+	--accent-inventory: #84600f;
+	--accent-payroll: #7b45d6;
+	--accent-expenses: #b23e31;
+	--accent-bookings: #17774a;
+	--accent-home: #65676e;
+	--accent-quoting-ink: color-mix(in oklab, var(--accent-quoting) 88%, black);
+	--accent-invoicing-ink: color-mix(in oklab, var(--accent-invoicing) 88%, black);
+	--accent-inventory-ink: color-mix(in oklab, var(--accent-inventory) 88%, black);
+	--accent-payroll-ink: color-mix(in oklab, var(--accent-payroll) 88%, black);
+	--accent-expenses-ink: color-mix(in oklab, var(--accent-expenses) 88%, black);
+	--accent-bookings-ink: color-mix(in oklab, var(--accent-bookings) 88%, black);
+	--accent-home-ink: color-mix(in oklab, var(--accent-home) 88%, black);
 }
+
 /*
- ---break---
+ * ---------------------------------------------------------------------------------------
+ * PER-TENANT BRAND
+ * ---------------------------------------------------------------------------------------
+ * Only --brand changes per tenant. Set it as an inline custom property alongside a
+ * `data-brand` attribute on the shell root — `brandAttrs()` in
+ * `$lib/components/theme` produces both — and the whole ramp re-derives from it.
+ *
+ * The re-derivation has to be repeated here rather than inherited: a custom property's
+ * var() references are substituted where the property is DECLARED, so the ramp declared
+ * on :root would keep resolving against :root's --brand no matter what a descendant sets.
+ * These are the same three blocks as above, verbatim.
+ *
+ * The ratios were checked across all four palette options for the 4.6:1 text floor (white
+ * on the fill, and --brand-ink on every surface) and the 3:1 non-text floor (the focus
+ * ring, and the fill against the surface behind it).
+ */
+[data-brand] {
+	--brand-hover: color-mix(in oklab, var(--brand) 92%, black);
+	--brand-active: color-mix(in oklab, var(--brand) 84%, black);
+	--brand-ring-soft: color-mix(in srgb, var(--brand) 28%, transparent);
+	--brand-tint: color-mix(in srgb, var(--brand) 15%, transparent);
+}
+
+:root:not(.light) [data-brand] {
+	--brand-focus-ring: color-mix(in oklab, var(--brand) 55%, white);
+	--brand-ink: color-mix(in oklab, var(--brand) 66%, white);
+}
+
+.light [data-brand] {
+	--brand-focus-ring: var(--brand-hover);
+	--brand-ink: color-mix(in oklab, var(--brand) 84%, black);
+}
+
+/*
+ * ---------------------------------------------------------------------------------------
+ * SHADCN SEMANTIC NAMES
+ * ---------------------------------------------------------------------------------------
+ * Mapped onto the tokens above so an unmodified shadcn-svelte component inherits the
+ * system without being touched. These are aliases, never independent values — changing a
+ * colour means changing the token, not this block.
+ */
+:root {
+	--background: var(--surface-base);
+	--foreground: var(--text-primary);
+	--card: var(--surface-card);
+	--card-foreground: var(--text-primary);
+	--popover: var(--surface-overlay);
+	--popover-foreground: var(--text-primary);
+	--primary: var(--brand);
+	--primary-foreground: var(--text-on-brand);
+	--secondary: var(--surface-raised);
+	--secondary-foreground: var(--text-primary);
+	--muted: var(--surface-raised);
+	--muted-foreground: var(--text-muted);
+	--accent: var(--surface-raised);
+	--accent-foreground: var(--text-primary);
+	--destructive: var(--state-wrong);
+	--destructive-foreground: var(--text-on-brand);
+	--border: var(--border-default);
+	--input: var(--border-control);
+	--ring: var(--brand-focus-ring);
+
+	--sidebar: var(--surface-sunken);
+	--sidebar-foreground: var(--text-secondary);
+	--sidebar-primary: var(--brand);
+	--sidebar-primary-foreground: var(--text-on-brand);
+	--sidebar-accent: var(--surface-raised);
+	--sidebar-accent-foreground: var(--text-primary);
+	--sidebar-border: var(--border-subtle);
+	--sidebar-ring: var(--brand-focus-ring);
+
+	/* The stock scale was five greys. Charts belong to the modules they describe. */
+	--chart-1: var(--accent-quoting);
+	--chart-2: var(--accent-invoicing);
+	--chart-3: var(--accent-inventory);
+	--chart-4: var(--accent-payroll);
+	--chart-5: var(--accent-bookings);
+}
+
+/*
+ * ---------------------------------------------------------------------------------------
+ * TAILWIND THEME
+ * ---------------------------------------------------------------------------------------
+ * `inline` keeps the utilities pointing at the custom property rather than copying its
+ * value, which is what lets `.light` re-theme everything without regenerating CSS.
  */
 @theme inline {
-	--font-sans: 'Inter Variable', sans-serif;
-	--color-sidebar-ring: var(--sidebar-ring);
-	--color-sidebar-border: var(--sidebar-border);
-	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-	--color-sidebar-accent: var(--sidebar-accent);
-	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-	--color-sidebar-primary: var(--sidebar-primary);
-	--color-sidebar-foreground: var(--sidebar-foreground);
-	--color-sidebar: var(--sidebar);
-	--color-chart-5: var(--chart-5);
-	--color-chart-4: var(--chart-4);
-	--color-chart-3: var(--chart-3);
-	--color-chart-2: var(--chart-2);
-	--color-chart-1: var(--chart-1);
-	--color-ring: var(--ring);
-	--color-input: var(--input);
-	--color-border: var(--border);
-	--color-destructive: var(--destructive);
-	--color-accent-foreground: var(--accent-foreground);
-	--color-accent: var(--accent);
-	--color-muted-foreground: var(--muted-foreground);
-	--color-muted: var(--muted);
-	--color-secondary-foreground: var(--secondary-foreground);
-	--color-secondary: var(--secondary);
-	--color-primary-foreground: var(--primary-foreground);
-	--color-primary: var(--primary);
-	--color-popover-foreground: var(--popover-foreground);
-	--color-popover: var(--popover);
-	--color-card-foreground: var(--card-foreground);
-	--color-card: var(--card);
-	--color-foreground: var(--foreground);
 	--color-background: var(--background);
-	--radius-sm: calc(var(--radius) * 0.6);
-	--radius-md: calc(var(--radius) * 0.8);
-	--radius-lg: var(--radius);
-	--radius-xl: calc(var(--radius) * 1.4);
-	--radius-2xl: calc(var(--radius) * 1.8);
-	--radius-3xl: calc(var(--radius) * 2.2);
-	--radius-4xl: calc(var(--radius) * 2.6);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-chart-1: var(--chart-1);
+	--color-chart-2: var(--chart-2);
+	--color-chart-3: var(--chart-3);
+	--color-chart-4: var(--chart-4);
+	--color-chart-5: var(--chart-5);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
+
+	/* The design's own vocabulary, for everything shadcn has no name for. */
+	--color-surface-base: var(--surface-base);
+	--color-surface-sunken: var(--surface-sunken);
+	--color-surface-card: var(--surface-card);
+	--color-surface-raised: var(--surface-raised);
+	--color-surface-overlay: var(--surface-overlay);
+	--color-surface-quiet: var(--surface-quiet);
+
+	--color-line-row: var(--border-row);
+	--color-line-subtle: var(--border-subtle);
+	--color-line-default: var(--border-default);
+	--color-line-control: var(--border-control);
+	--color-line-strong: var(--border-strong);
+	--color-line-hover: var(--border-hover);
+
+	--color-ink: var(--text-primary);
+	--color-ink-strong-secondary: var(--text-strong-secondary);
+	--color-ink-secondary: var(--text-secondary);
+	--color-ink-muted: var(--text-muted);
+	--color-ink-on-brand: var(--text-on-brand);
+	--color-decoration-quiet: var(--decoration-quiet);
+
+	--color-brand: var(--brand);
+	--color-brand-hover: var(--brand-hover);
+	--color-brand-active: var(--brand-active);
+	--color-brand-focus-ring: var(--brand-focus-ring);
+	--color-brand-ink: var(--brand-ink);
+	--color-brand-tint: var(--brand-tint);
+	--color-brand-ring-soft: var(--brand-ring-soft);
+
+	--color-settled: var(--state-settled);
+	--color-attention: var(--state-attention);
+	--color-wrong: var(--state-wrong);
+	--color-settled-tint: var(--state-settled-tint);
+	--color-attention-tint: var(--state-attention-tint);
+	--color-wrong-tint: var(--state-wrong-tint);
+	--color-settled-ink: var(--state-settled-ink);
+	--color-attention-ink: var(--state-attention-ink);
+	--color-wrong-ink: var(--state-wrong-ink);
+	--color-wrong-border: var(--state-wrong-border);
+	--color-wrong-border-quiet: var(--state-wrong-border-quiet);
+
+	--color-quoting: var(--accent-quoting);
+	--color-invoicing: var(--accent-invoicing);
+	--color-inventory: var(--accent-inventory);
+	--color-payroll: var(--accent-payroll);
+	--color-expenses: var(--accent-expenses);
+	--color-bookings: var(--accent-bookings);
+	--color-home: var(--accent-home);
+	--color-quoting-tint: var(--accent-quoting-tint);
+	--color-invoicing-tint: var(--accent-invoicing-tint);
+	--color-inventory-tint: var(--accent-inventory-tint);
+	--color-payroll-tint: var(--accent-payroll-tint);
+	--color-expenses-tint: var(--accent-expenses-tint);
+	--color-bookings-tint: var(--accent-bookings-tint);
+	--color-home-tint: var(--accent-home-tint);
+	--color-quoting-ink: var(--accent-quoting-ink);
+	--color-invoicing-ink: var(--accent-invoicing-ink);
+	--color-inventory-ink: var(--accent-inventory-ink);
+	--color-payroll-ink: var(--accent-payroll-ink);
+	--color-expenses-ink: var(--accent-expenses-ink);
+	--color-bookings-ink: var(--accent-bookings-ink);
+	--color-home-ink: var(--accent-home-ink);
+
+	--color-paper: var(--paper-bg);
+	--color-paper-ink: var(--paper-ink);
+	--color-paper-ink-muted: var(--paper-ink-muted);
+	--color-paper-rule: var(--paper-rule);
+	--color-paper-rule-light: var(--paper-rule-light);
+
+	/*
+	 * rounded-md is the control radius, rounded-lg the card, rounded-xl the dialog — so
+	 * stock shadcn components land on the design's 8 / 12 / 14 without being touched.
+	 */
+	--radius-sm: 6px;
+	--radius-md: var(--radius-control);
+	--radius-lg: var(--radius-card);
+	--radius-xl: var(--radius-dialog);
+	--radius-2xl: 18px;
 }
+
 /*
- ---break---
+ * Static theme values — no `inline`, because none of these change with the theme.
+ *
+ * Spacing is Tailwind's stock 0.25rem scale, which already lands the design's
+ * 4 / 8 / 12 / 16 / 24 / 32 exactly on 1 / 2 / 3 / 4 / 6 / 8. Nothing to redefine.
  */
+@theme {
+	--font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+	--font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', monospace;
+
+	/* The design's type scale. Named by role, because 14px is never "text-sm" here. */
+	--text-hero: 2rem; /* 32 / 600 */
+	--text-hero--line-height: 1.15;
+	--text-hero--letter-spacing: -0.02em;
+	--text-hero--font-weight: 600;
+
+	--text-title: 1.5rem; /* 24 / 600 — page title */
+	--text-title--line-height: 1.25;
+	--text-title--letter-spacing: -0.02em;
+	--text-title--font-weight: 600;
+
+	--text-section: 1.25rem; /* 20 / 500 — section heading */
+	--text-section--line-height: 1.35;
+	--text-section--letter-spacing: -0.01em;
+	--text-section--font-weight: 500;
+
+	--text-body: 1rem; /* 16 / 400 — prose */
+	--text-body--line-height: 1.55;
+
+	--text-ui: 0.875rem; /* 14 / 400 — default interface text, table cells */
+	--text-ui--line-height: 1.45;
+
+	--text-helper: 0.75rem; /* 12 / 400 — helper, timestamps */
+	--text-helper--line-height: 1.4;
+
+	--text-eyebrow: 0.6875rem; /* 11 / 500 / 0.1em / uppercase */
+	--text-eyebrow--line-height: 1.3;
+	--text-eyebrow--letter-spacing: 0.1em;
+	--text-eyebrow--font-weight: 500;
+
+	--ease-out-forward: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/*
+ * Every numeral in the product — money, quantity, dates in tables, document numbers,
+ * keyboard hints — is JetBrains Mono and tabular, so columns align on the decimal.
+ * `<Amount>` and friends (T03) build on this; nothing should hand-roll it.
+ */
+@utility numeric {
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: 'tnum' 1;
+}
+
+/* Eyebrow labels are uppercase by definition, which `text-eyebrow` alone cannot express. */
+@utility eyebrow {
+	@apply text-eyebrow uppercase;
+	color: var(--text-muted);
+}
+
 @layer base {
 	* {
 		@apply border-border outline-ring/50;
 	}
-	body {
-		@apply bg-background text-foreground;
-	}
+
 	html {
 		@apply font-sans;
+		/* 14px is the default interface size, not 16px. Prose opts back up with text-body. */
+		font-size: 100%;
+	}
+
+	body {
+		@apply bg-background text-foreground;
+		font-size: var(--text-ui);
+		line-height: var(--text-ui--line-height);
+		-webkit-font-smoothing: antialiased;
+	}
+
+	/* Forward only, and never in a way that fights a reduced-motion preference. */
+	@media (prefers-reduced-motion: reduce) {
+		*,
+		*::before,
+		*::after {
+			animation-duration: 0.01ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.01ms !important;
+			scroll-behavior: auto !important;
+		}
 	}
 }

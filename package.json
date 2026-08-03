@@ -28,6 +28,7 @@
 	},
 	"dependencies": {
 		"@fontsource-variable/inter": "^5.3.0",
+		"@fontsource-variable/jetbrains-mono": "^5.3.0",
 		"@lucide/svelte": "^1.28.0",
 		"better-auth": "^1.6.25",
 		"clsx": "^2.1.1",
@@ -44,6 +45,7 @@
 	"devDependencies": {
 		"@chromatic-com/storybook": "^5.2.1",
 		"@eslint/js": "^10.0.1",
+		"@internationalized/date": "^3.12.0",
 		"@playwright/test": "^1.62.1",
 		"@storybook/addon-a11y": "^10.5.5",
 		"@storybook/addon-docs": "^10.5.5",
@@ -61,6 +63,7 @@
 		"@vitest/browser-playwright": "^4.1.10",
 		"@vitest/coverage-v8": "^4.1.10",
 		"auth": "^1.6.23",
+		"bits-ui": "^2.16.3",
 		"drizzle-kit": "^0.31.10",
 		"embedded-postgres": "^18.4.0-beta.17",
 		"eslint": "^10.4.1",
@@ -77,6 +80,7 @@
 		"storybook": "^10.5.5",
 		"svelte": "^5.56.1",
 		"svelte-check": "^4.6.0",
+		"svelte-sonner": "^1.1.0",
 		"tailwindcss": "^4.3.0",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.60.1",
