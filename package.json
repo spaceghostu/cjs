@@ -22,7 +22,8 @@
 		"db:dev:stop": "bun run scripts/dev-db.ts stop",
 		"db:dev:reset": "bun run scripts/dev-db.ts reset",
 		"db:generate": "drizzle-kit generate",
-		"db:migrate": "drizzle-kit migrate",
+		"db:migrate": "drizzle-kit migrate && bun run db:verify",
+		"db:verify": "bun run scripts/invariants.ts",
 		"db:studio": "drizzle-kit studio",
 		"test:money": "vitest run --project unit --coverage.enabled --coverage.include='src/lib/core/money/**' --coverage.exclude='src/lib/core/money/*.test.ts' --coverage.exclude='src/lib/core/money/index.ts'"
 	},

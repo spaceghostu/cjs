@@ -20,6 +20,7 @@ import { sql } from 'drizzle-orm';
 import pg from 'pg';
 import { env } from '$lib/server/env';
 import * as schema from './schema';
+import type { Tx } from './tx';
 
 /**
  * Pool sizing. The dashboard streams one short transaction per owned module, so the
@@ -101,6 +102,69 @@ export function assertDatabaseRoleIsSafe(): Promise<void> {
 	})();
 
 	return roleChecked;
+}
+
+/**
+ * THE ONLY PLACE A `Tx` IS MINTED.
+ *
+ * Opens a transaction, establishes the tenant context on that connection, and hands the
+ * caller a branded handle. Everything downstream — every policy, every audit row — depends
+ * on the two statements at the top of this function having run.
+ *
+ * WHY `set_config(..., true)` AND NOT `SET`
+ * -----------------------------------------
+ * The third argument is `is_local`, which makes this exactly `SET LOCAL`: the value is
+ * reverted when the transaction ends. A plain `SET` would persist on the pooled connection
+ * after it is returned, and the NEXT request to borrow that connection would inherit the
+ * previous request's business id — a cross-tenant data leak with no bug at the call site
+ * and nothing in the logs. `client.test.ts` proves the reversion on a single-connection
+ * pool, which is the only way to observe it deterministically.
+ *
+ * `SET LOCAL` itself cannot be parameterised (it takes an identifier, not an expression),
+ * so the value would have to be interpolated into SQL text. `set_config` is a function
+ * call, takes bound parameters, and is therefore not something a hostile business id can
+ * escape out of.
+ *
+ * @internal Not for module code. `withModule`/`withBusiness` in `../ctx.ts` are the
+ * supported doors, and they apply the entitlement gate that this function deliberately
+ * knows nothing about.
+ */
+export function runScoped<T>(
+	businessId: string,
+	userId: string | null,
+	fn: (tx: Tx) => Promise<T>
+): Promise<T> {
+	return unsafeDb.transaction(async (tx) => {
+		await tx.execute(sql`select set_config('cjs.business_id', ${businessId}, true)`);
+		// Empty string, not NULL: `set_config` rejects NULL, and `app.current_user_id()`
+		// maps '' back to NULL. Background work genuinely has no user, and an audit row
+		// that says so is more honest than one attributed to whoever ran the migration.
+		await tx.execute(sql`select set_config('cjs.user_id', ${userId ?? ''}, true)`);
+		return fn(tx as Tx);
+	});
+}
+
+/**
+ * The one query that runs before a tenant is known: "which businesses is this person in?".
+ *
+ * Sign-in has a chicken-and-egg problem — the business id that drives every policy is
+ * itself stored in a tenant table. The usual escape is a `SECURITY DEFINER` function that
+ * reads membership with the owner's rights, which puts a deliberate hole in the floor and
+ * makes "there is no way around RLS" false.
+ *
+ * Instead this sets `cjs.user_id` and nothing else. Two SELECT-only policies —
+ * `member_sees_own_membership` and `member_sees_own_business` in `0003_platform.sql` — let
+ * a person see their own membership rows and the businesses those rows point at. Every
+ * other table still evaluates `business_id = NULL` and returns nothing, so the reach of
+ * this function is exactly two tables and exactly the rows that are already theirs.
+ *
+ * @internal Used by `hooks.server.ts` to resolve the acting business, and by nothing else.
+ */
+export function runAsUser<T>(userId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
+	return unsafeDb.transaction(async (tx) => {
+		await tx.execute(sql`select set_config('cjs.user_id', ${userId}, true)`);
+		return fn(tx as Tx);
+	});
 }
 
 /** For graceful shutdown and for integration tests. */

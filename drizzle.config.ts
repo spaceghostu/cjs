@@ -18,9 +18,12 @@ export default defineConfig({
 	dialect: 'postgresql',
 	dbCredentials: { url },
 	casing: 'snake_case',
-	// Identity is better-auth's; app/audit are hand-written platform SQL. drizzle-kit must
-	// not try to manage or drop anything in them.
-	schemaFilter: ['public', 'identity'],
+	// `app` holds only functions and triggers, which drizzle-kit has no concept of and would
+	// therefore report as drift forever. It is hand-written platform SQL and off-limits.
+	// `audit` holds an ordinary table, so drizzle-kit generates it — what makes it an audit
+	// log (the trigger, the RLS policy, the withheld UPDATE/DELETE grants) is hand-written
+	// alongside, because none of that has a Drizzle representation either.
+	schemaFilter: ['public', 'identity', 'audit'],
 	verbose: true,
 	strict: true
 });

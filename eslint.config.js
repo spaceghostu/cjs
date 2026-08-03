@@ -216,8 +216,30 @@ const architectureZones = [
 		}
 	},
 
-	// 9. Anti-dark-pattern: no countdowns anywhere near billing. The undo window shows a
-	//    DATE, never a ticking clock. Manufactured urgency is off the table.
+	// 9. Test fixtures connect as the DDL role and delete rows — two things the application
+	//    must never do. They are useful enough to be tempting as a seeding shortcut, so the
+	//    boundary is a rule rather than a comment.
+	{
+		files: ['src/**/*.{ts,js,svelte}'],
+		ignores: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					patterns: [
+						{
+							group: ['$lib/server/core/db/fixtures', '**/core/db/fixtures', './fixtures'],
+							message:
+								'db/fixtures is test-only: it connects as the DDL role and deletes rows. Application code goes through withBusiness()/withModule().'
+						}
+					]
+				}
+			]
+		}
+	},
+
+	// 10. Anti-dark-pattern: no countdowns anywhere near billing. The undo window shows a
+	//     DATE, never a ticking clock. Manufactured urgency is off the table.
 	{
 		files: ['src/lib/server/core/billing/**', 'src/routes/(app)/settings/modules/**'],
 		rules: {

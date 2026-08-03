@@ -15,6 +15,20 @@
       "when": 1785528460727,
       "tag": "0001_identity_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785762628232,
+      "tag": "0002_steep_veda",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785762688880,
+      "tag": "0003_platform",
+      "breakpoints": true
     }
   ]
 }

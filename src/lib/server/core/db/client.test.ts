@@ -2,7 +2,7 @@
  * The driver contract.
  *
  * Everything in the tenancy floor rests on one mechanism: a transaction-scoped GUC set with
- * `set_config(..., is_local => true)`, read back by `app.biz()` inside an RLS policy. If
+ * `set_config(..., is_local => true)`, read back by `app.current_business_id()` inside an RLS policy. If
  * that does not work, there is no tenant isolation, no entitlement enforcement, no audit
  * actor attribution and no atomic document numbering.
  *
@@ -23,7 +23,7 @@ const BIZ_B = '22222222-2222-4222-8222-222222222222';
 
 async function currentBiz(tx: { execute: typeof unsafeDb.execute }) {
 	const { rows } = await tx.execute<{ biz: string | null }>(
-		sql`select nullif(current_setting('app.business_id', true), '') as biz`
+		sql`select nullif(current_setting('cjs.business_id', true), '') as biz`
 	);
 	return rows[0].biz;
 }
@@ -57,7 +57,7 @@ describe('the database driver supports the tenancy mechanism', () => {
 
 	it('sets a transaction-scoped GUC and reads it back', async () => {
 		const seen = await unsafeDb.transaction(async (tx) => {
-			await tx.execute(sql`select set_config('app.business_id', ${BIZ_A}, true)`);
+			await tx.execute(sql`select set_config('cjs.business_id', ${BIZ_A}, true)`);
 			return currentBiz(tx);
 		});
 		expect(seen).toBe(BIZ_A);
@@ -68,7 +68,7 @@ describe('the database driver supports the tenancy mechanism', () => {
 		// COMMIT. If it leaked, business B's request could inherit business A's context from
 		// a recycled backend — a cross-tenant data leak with no code path to blame.
 		await unsafeDb.transaction(async (tx) => {
-			await tx.execute(sql`select set_config('app.business_id', ${BIZ_A}, true)`);
+			await tx.execute(sql`select set_config('cjs.business_id', ${BIZ_A}, true)`);
 			expect(await currentBiz(tx)).toBe(BIZ_A);
 		});
 
@@ -82,12 +82,12 @@ describe('the database driver supports the tenancy mechanism', () => {
 		// Two overlapping requests for different businesses must never see each other's GUC.
 		const [a, b] = await Promise.all([
 			unsafeDb.transaction(async (tx) => {
-				await tx.execute(sql`select set_config('app.business_id', ${BIZ_A}, true)`);
+				await tx.execute(sql`select set_config('cjs.business_id', ${BIZ_A}, true)`);
 				await tx.execute(sql`select pg_sleep(0.05)`);
 				return currentBiz(tx);
 			}),
 			unsafeDb.transaction(async (tx) => {
-				await tx.execute(sql`select set_config('app.business_id', ${BIZ_B}, true)`);
+				await tx.execute(sql`select set_config('cjs.business_id', ${BIZ_B}, true)`);
 				await tx.execute(sql`select pg_sleep(0.05)`);
 				return currentBiz(tx);
 			})
@@ -97,7 +97,7 @@ describe('the database driver supports the tenancy mechanism', () => {
 	});
 
 	it('reads an unset GUC as NULL rather than raising', async () => {
-		// `app.biz()` depends on this: no GUC => NULL => the RLS predicate is NULL => zero
+		// `app.current_business_id()` depends on this: no GUC => NULL => the RLS predicate is NULL => zero
 		// rows. A bug renders an empty page; it cannot render another business's data.
 		expect(await currentBiz(unsafeDb)).toBeNull();
 	});

@@ -14,3 +14,5 @@
  *   modules   — one line per module, appended by the scaffold
  */
 export * from './schema/identity';
+export * from './schema/core';
+export * from './schema/audit';
