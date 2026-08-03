@@ -1,47 +1,38 @@
 /// <reference types="vitest/config" />
 import tailwindcss from '@tailwindcss/vite';
 
-import adapter from '@sveltejs/adapter-auto';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 
-const dirname =
-	typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
+const dirname = import.meta.dirname;
 
+// SvelteKit configuration — adapter, forced runes mode, tsconfig includes — lives in
+// svelte.config.js, which is the file vite-plugin-svelte, Vitest, svelte-check and the
+// shadcn-svelte CLI all read. Inline config here left them guessing.
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
-	plugins: [
-		tailwindcss(),
-		sveltekit({
-			compilerOptions: {
-				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
-				runes: ({ filename }) =>
-					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
-			},
-
-			// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.
-			// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
-			// See https://svelte.dev/docs/kit/adapters for more information about adapters.
-			adapter: adapter(),
-
-			typescript: {
-				config: (config) => {
-					config.include.push('../drizzle.config.ts');
-				}
-			}
-		})
-	],
+	plugins: [tailwindcss(), sveltekit()],
 	test: {
 		projects: [
+			// Plain node tests: money arithmetic, tenancy, entitlement, audit, registry
+			// invariants. Without this project `src/**/*.test.ts` would never run at all.
+			{
+				extends: true,
+				test: {
+					name: 'unit',
+					environment: 'node',
+					include: ['src/**/*.{test,spec}.{js,ts}', 'src/**/*.svelte.{test,spec}.{js,ts}'],
+					exclude: ['src/**/*.stories.*', 'src/**/*.mobile.spec.ts']
+				}
+			},
 			{
 				extends: true,
 				plugins: [storybookTest({ configDir: path.join(dirname, '.storybook') })],
 				test: {
-					name: 'storybook',
+					name: 'stories-light',
 					browser: {
 						enabled: true,
 						headless: true,
@@ -49,7 +40,58 @@ export default defineConfig({
 						instances: [{ browser: 'chromium' }]
 					}
 				}
+			},
+			{
+				extends: true,
+				plugins: [
+					storybookTest({
+						configDir: path.join(dirname, '.storybook'),
+						initialGlobals: { theme: 'dark' }
+					})
+				],
+				test: {
+					name: 'stories-dark',
+					browser: {
+						enabled: true,
+						headless: true,
+						provider: playwright({}),
+						instances: [{ browser: 'chromium' }]
+					}
+				}
+			},
+			// Component-level phone assertions (44px targets, no horizontal overflow).
+			// Full check-and-act FLOWS live in e2e/ under real Playwright — Vitest browser
+			// mode is a component runner and cannot navigate server routes or kill a tab.
+			{
+				extends: true,
+				test: {
+					name: 'mobile',
+					include: ['src/**/*.mobile.spec.ts'],
+					browser: {
+						enabled: true,
+						headless: true,
+						provider: playwright({}),
+						instances: [{ browser: 'chromium', viewport: { width: 390, height: 844 } }]
+					}
+				}
 			}
-		]
+		],
+		coverage: {
+			provider: 'v8',
+			include: ['src/lib/**'],
+			// Vendored shadcn primitives must not dilute the coverage target.
+			exclude: ['src/lib/components/ui/**', 'src/**/*.stories.*'],
+			thresholds: {
+				// The brief: "Financial accuracy is absolute. Rounding and precision errors in
+				// money are not acceptable defects." Nothing in the money engine ships
+				// unexercised — not one branch. This is a ratchet, not an aspiration.
+				'src/lib/core/money/**': {
+					statements: 100,
+					branches: 100,
+					functions: 100,
+					lines: 100
+				}
+			}
+		}
 	}
 });

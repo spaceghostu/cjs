@@ -24,3 +24,9 @@ vite.config.ts.timestamp-*
 
 *storybook.log
 storybook-static
+
+# Local dev database (embedded-postgres cluster)
+.dev/
+
+# Test coverage output
+coverage/
