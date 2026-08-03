@@ -46,14 +46,14 @@ function isPreBusiness(pathname: string): boolean {
 const handleIdentity: Handle = async ({ event, resolve }) => {
 	event.locals.requestId = randomUUID();
 
-	const session = await auth.api.getSession({ headers: event.request.headers });
+	const session = await auth().api.getSession({ headers: event.request.headers });
 
 	if (session) {
 		event.locals.session = session.session;
 		event.locals.user = session.user;
 	}
 
-	return svelteKitHandler({ event, resolve, auth, building });
+	return svelteKitHandler({ event, resolve, auth: auth(), building });
 };
 
 /**

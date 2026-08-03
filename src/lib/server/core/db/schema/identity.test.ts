@@ -21,7 +21,7 @@ import { user, session, account, verification } from './identity';
 type Adapter = Awaited<ReturnType<typeof adapterFor>>;
 
 async function adapterFor() {
-	const ctx = await auth.$context;
+	const ctx = await auth().$context;
 	return ctx.adapter;
 }
 
