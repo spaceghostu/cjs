@@ -16,11 +16,14 @@
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import pg from 'pg';
+import type { RequestEvent } from '@sveltejs/kit';
 import { env } from '$lib/server/env';
 import { DEFAULT_BRAND, type BrandColor } from '$lib/components/theme/brand';
+import { NO_ACCESS, type AccessMap } from '../entitlement';
 import { runScoped, unsafeDb } from './client';
+import { toBusiness, toMember } from './map';
 import { user } from './schema/identity';
-import type { MemberRole } from './schema/core';
+import { business as businessTable, member as memberTable, type MemberRole } from './schema/core';
 
 /** Unique per process and per call, so parallel test files never collide. */
 let counter = 0;
@@ -138,6 +141,40 @@ export async function createCustomer(
 		`);
 	});
 	return id;
+}
+
+/**
+ * The `locals` the hooks would have produced for this person acting for this business.
+ *
+ * Built here rather than by running the hook stack, so a test can state exactly which part
+ * of the request context is present — which is the point, since most of the interesting
+ * tests are about what happens when one part is missing.
+ */
+export async function localsFor(
+	user: TestUser,
+	business: TestBusiness,
+	access: AccessMap = NO_ACCESS
+): Promise<Partial<App.Locals>> {
+	return runScoped(business.id, user.id, async (tx) => {
+		const [businessRow] = await tx.select().from(businessTable);
+		const [memberRow] = await tx.select().from(memberTable);
+		return {
+			user: { id: user.id, name: user.name, email: user.email } as App.Locals['user'],
+			business: toBusiness(businessRow),
+			member: toMember(memberRow),
+			access,
+			requestId: 'req-test'
+		};
+	});
+}
+
+/** A `RequestEvent` carrying those locals. Only the fields the ctx layer reads are real. */
+export function eventFor(locals: Partial<App.Locals>, pathname = '/dashboard'): RequestEvent {
+	return {
+		locals: { requestId: 'req-test', ...locals },
+		url: new URL(`http://localhost:5173${pathname}`),
+		cookies: { get: () => undefined, set: () => {} }
+	} as unknown as RequestEvent;
 }
 
 /**

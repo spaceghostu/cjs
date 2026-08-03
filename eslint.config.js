@@ -24,9 +24,20 @@ const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
  */
 const architectureZones = [
 	// 1. Nobody outside db/ may touch the unscoped connection.
+	//
+	//    `ctx.ts` is on this list because it IS the exception the architecture describes:
+	//    the one module that takes the unscoped handle, establishes tenancy, attribution and
+	//    entitlement on it, and hands out a branded `Tx`. `hooks.server.ts` is here for the
+	//    single query that must run before a tenant exists — resolving which business a
+	//    signed-in person is acting for.
 	{
 		files: ['src/**/*.{ts,js,svelte}'],
-		ignores: ['src/lib/server/core/db/**', 'src/lib/server/auth.ts'],
+		ignores: [
+			'src/lib/server/core/db/**',
+			'src/lib/server/core/ctx.ts',
+			'src/lib/server/auth.ts',
+			'src/hooks.server.ts'
+		],
 		rules: {
 			'no-restricted-imports': [
 				'error',
