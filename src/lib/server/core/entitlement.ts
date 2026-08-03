@@ -20,44 +20,36 @@
  * The shape, the arithmetic and the failure mode are here and fully tested. The DATA — the
  * catalogue, prices, and the `billing_subscription` rows that produce the periods — is T10.
  * `loadSubscriptionPeriods` below is the single seam where that lands.
+ *
+ * The keys themselves moved to `$lib/core/modules/catalogue` when the shell landed: the
+ * sidebar and the bottom nav are client components and cannot import `$lib/server`, so a
+ * key list that lived only here would have had to be restated for them. They are re-exported
+ * below, so `import { ModuleKey } from '$lib/server/core/entitlement'` still reads the way
+ * a route wants it to — entitlement is what every route asks about.
  */
 import { error } from '@sveltejs/kit';
 import { sql } from 'drizzle-orm';
 import type { Tx } from './db/tx';
+import {
+	MODULE_KEYS,
+	NO_ACCESS,
+	isModuleKey,
+	label,
+	type Access,
+	type AccessMap,
+	type ModuleKey
+} from '$lib/core/modules/catalogue';
 
 /**
- * The seven modules the design's catalogue names.
- *
- * Three have screens (Quoting, Invoicing, Inventory). The rest exist so the catalogue,
- * switcher and billing are real: they render, they price, they are addable, and their module
- * route is the locked state until somebody builds them.
- *
- * T10 moves the prices, accents and categories into `modules/catalogue.ts`; the keys stay
- * here because entitlement is what every route asks about.
+ * `none` is locked, `read` is a removed module's archive, `write` is owned — defined in the
+ * catalogue so the shell can render the three states, re-exported here because entitlement
+ * is what every route asks about.
  */
-export const MODULE_KEYS = [
-	'quoting',
-	'invoicing',
-	'bookings',
-	'inventory',
-	'scheduling',
-	'payroll',
-	'expenses'
-] as const;
-
-export type ModuleKey = (typeof MODULE_KEYS)[number];
-
-export function isModuleKey(value: unknown): value is ModuleKey {
-	return typeof value === 'string' && (MODULE_KEYS as readonly string[]).includes(value);
-}
-
-/** `none` is locked, `read` is a removed module's archive, `write` is owned. */
-export type Access = 'none' | 'read' | 'write';
+export { MODULE_KEYS, NO_ACCESS, isModuleKey, label };
+export type { Access, AccessMap, ModuleKey };
 
 /** What a caller is about to do. The reason `read` and `write` are gated differently. */
 export type Intent = 'read' | 'write';
-
-export type AccessMap = Readonly<Record<ModuleKey, Access>>;
 
 /**
  * One stretch of time a business owned a module.
@@ -71,11 +63,6 @@ export type SubscriptionPeriod = {
 	/** Null while the module is still owned. */
 	endedAt: Date | null;
 };
-
-/** Every module locked. The starting point, and the answer for a request with no business. */
-export const NO_ACCESS: AccessMap = Object.freeze(
-	Object.fromEntries(MODULE_KEYS.map((key) => [key, 'none' as const]))
-) as AccessMap;
 
 /**
  * Periods -> access, as of a moment.
@@ -152,20 +139,6 @@ export function refuse(moduleKey: ModuleKey, access: Access): never {
 		nextHref: '/settings/modules',
 		nextLabel: `Add ${label(moduleKey)} back`
 	});
-}
-
-const LABELS: Record<ModuleKey, string> = {
-	quoting: 'Quoting',
-	invoicing: 'Invoicing',
-	bookings: 'Bookings',
-	inventory: 'Inventory',
-	scheduling: 'Job scheduling',
-	payroll: 'Payroll',
-	expenses: 'Expenses'
-};
-
-export function label(moduleKey: ModuleKey): string {
-	return LABELS[moduleKey];
 }
 
 /**

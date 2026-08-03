@@ -22,7 +22,17 @@ export default defineConfig({
 		// browser as raw CommonJS, and every story file dies during setup on
 		// `does not provide an export named 'elementRoles'` before a single test runs.
 		// Naming the parent is enough; the optimizer pulls the whole tree in with it.
-		include: ['@testing-library/dom', 'storybook/test']
+		include: [
+			'@testing-library/dom',
+			'storybook/test',
+			// The shell imports its glyphs one file at a time (`@lucide/svelte/icons/house`),
+			// which is what keeps the client bundle to the eight icons it uses instead of the
+			// whole set. Vite does not discover deep paths until the first story asks for one —
+			// and by then the story run is underway, so the optimizer re-bundles and reloads
+			// mid-test: "Vite unexpectedly reloaded a test". Naming the directory up front
+			// means the icons are already there when the first story mounts.
+			'@lucide/svelte/icons/*'
+		]
 	},
 	test: {
 		projects: [
