@@ -53,6 +53,36 @@ describe('formatZar', () => {
 		expect(formatZar(R(-0))).toBe('R0,00');
 	});
 
+	describe('whole rand (decimals: 0)', () => {
+		// Screen summaries read in whole rand — "R84 200 outstanding" is the number the
+		// owner is thinking about. Documents keep their cents; that is not optional.
+		it('drops the cents and the decimal separator entirely', () => {
+			expect(formatZar(R(8_420_000), { decimals: 0 })).toBe(`R84${nb}200`);
+			expect(formatZar(R(0), { decimals: 0 })).toBe('R0');
+			expect(formatZar(R(123_456), { decimals: 0 })).toBe(`R1${nb}235`);
+		});
+
+		it('rounds half away from zero, the same as every computed figure', () => {
+			expect(formatZar(R(150), { decimals: 0 })).toBe('R2');
+			expect(formatZar(R(149), { decimals: 0 })).toBe('R1');
+			expect(formatZar(R(-150), { decimals: 0 })).toBe('-R2');
+			expect(formatZar(R(-149), { decimals: 0 })).toBe('-R1');
+		});
+
+		it('still honours symbol, grouping and parens', () => {
+			expect(formatZar(R(8_420_000), { decimals: 0, symbol: false })).toBe(`84${nb}200`);
+			expect(formatZar(R(8_420_000), { decimals: 0, grouping: false })).toBe('R84200');
+			expect(formatZar(R(-8_420_000), { decimals: 0, parens: true })).toBe(`(R84${nb}200)`);
+		});
+
+		it('rounds a sub-rand amount to nothing rather than hiding it as "R0,50"', () => {
+			// A screen that says "R0" for fifty cents is honest about its own precision.
+			// Anything that must be exact shows cents.
+			expect(formatZar(R(49), { decimals: 0 })).toBe('R0');
+			expect(formatZar(R(50), { decimals: 0 })).toBe('R1');
+		});
+	});
+
 	it('falls back to the ISO code for a currency with no symbol yet', () => {
 		// The day the CurrencyCode union widens, an unmapped currency must render as
 		// "EUR 1 234,56" rather than "undefined1 234,56".

@@ -9,6 +9,7 @@
  *
  * South African convention: space for thousands, comma for the decimal. R1 234,56.
  */
+import { roundDiv } from './math';
 import type { Money, Quantity, Rate, UnitPrice } from './types';
 
 /**
@@ -49,18 +50,30 @@ export type FormatOptions = {
 	 * parentheses are jargon; the brief's user is not an accountant.
 	 */
 	parens?: boolean;
+	/**
+	 * 2 (default) or 0. A DOCUMENT always shows cents — it is a tax invoice, and dropping
+	 * them there would be a defect. A SCREEN summary reads better in whole rand: "R84 200
+	 * outstanding" is the number the owner is actually thinking about.
+	 *
+	 * Rounding goes through `roundDiv`, the one rounding function in this codebase, so a
+	 * displayed whole-rand figure rounds the same way every computed one does.
+	 */
+	decimals?: 2 | 0;
 };
 
 export function formatZar(m: Money, opts: FormatOptions = {}): string {
-	const { symbol = true, grouping = true, parens = false } = opts;
+	const { symbol = true, grouping = true, parens = false, decimals = 2 } = opts;
 	const negative = m.cents < 0;
-	const { whole, frac } = split(Math.abs(m.cents), 2);
+	const magnitude = Math.abs(m.cents);
+	const separator = grouping ? THOUSANDS_SEPARATOR : '';
+	const { whole, frac } = split(magnitude, 2);
 
-	const body =
-		(symbol ? (SYMBOL[m.currency] ?? `${m.currency} `) : '') +
-		group(whole, grouping ? THOUSANDS_SEPARATOR : '') +
-		DECIMAL_SEPARATOR +
-		frac;
+	const digits =
+		decimals === 0
+			? group(String(roundDiv(BigInt(magnitude), 100n)), separator)
+			: group(whole, separator) + DECIMAL_SEPARATOR + frac;
+
+	const body = (symbol ? (SYMBOL[m.currency] ?? `${m.currency} `) : '') + digits;
 
 	if (!negative) return body;
 	return parens ? `(${body})` : `-${body}`;
