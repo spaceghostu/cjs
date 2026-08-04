@@ -14,7 +14,7 @@
  * makes the test helper mildly inconvenient is the strongest evidence it is real.
  */
 import { randomUUID } from 'node:crypto';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import pg from 'pg';
 import type { RequestEvent } from '@sveltejs/kit';
 import { env } from '$lib/server/env';
@@ -157,7 +157,10 @@ export async function localsFor(
 ): Promise<Partial<App.Locals>> {
 	return runScoped(business.id, user.id, async (tx) => {
 		const [businessRow] = await tx.select().from(businessTable);
-		const [memberRow] = await tx.select().from(memberTable);
+		// The member row for THIS person, not whichever comes back first. A business with an
+		// owner and a staff member has two, and the role on it is what gates billing — so
+		// picking the wrong one would quietly make every staff-is-refused test pass.
+		const [memberRow] = await tx.select().from(memberTable).where(eq(memberTable.userId, user.id));
 		return {
 			user: { id: user.id, name: user.name, email: user.email } as App.Locals['user'],
 			business: toBusiness(businessRow),
@@ -225,6 +228,7 @@ export async function cleanupFixtures(): Promise<void> {
 				await client.query('select set_config($1, $2, true)', ['cjs.business_id', businessId]);
 				for (const table of [
 					'audit.row_change',
+					'billing_subscription',
 					'core_document_number',
 					'core_customer',
 					'core_member',

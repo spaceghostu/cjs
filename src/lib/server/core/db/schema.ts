@@ -15,4 +15,5 @@
  */
 export * from './schema/identity';
 export * from './schema/core';
+export * from './schema/billing';
 export * from './schema/audit';

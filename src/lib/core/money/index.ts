@@ -43,6 +43,20 @@ export type {
 } from './price';
 export { VAT_POLICY, priceDocument } from './price';
 
+export type { BillingDate, ProrationPolicy, ProrationQuote } from './proration';
+export {
+	BILLING_OFFSET_MINUTES,
+	PRORATION_POLICY,
+	billingDate,
+	daysInBillingMonth,
+	daysRemainingInMonth,
+	firstOfNextMonth,
+	isSameBillingDay,
+	prorateDaysHeld,
+	prorateRemainderOfMonth,
+	quoteAddition
+} from './proration';
+
 export type { ParseResult } from './parse';
 export { parseMoneyInput, parseQuantityInput, parseUnitPriceInput } from './parse';
 

@@ -17,7 +17,8 @@
 import { error } from '@sveltejs/kit';
 import { isModuleKey } from '$lib/core/modules/catalogue';
 import { moduleRow, modulePrice } from '$lib/server/core/modules/catalogue';
-import { moduleAccess } from '$lib/server/core/ctx';
+import { moduleAccess, withBusiness } from '$lib/server/core/ctx';
+import { carryoverSummary, loadCarryover } from '$lib/server/core/modules/carryover';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
@@ -29,6 +30,19 @@ export const load: PageServerLoad = async (event) => {
 
 	const row = moduleRow(key);
 	const price = modulePrice(key);
+	const access = moduleAccess(event, key);
+
+	/**
+	 * The locked state names what this business would actually get — "It would arrive with
+	 * your 4 people already loaded" — so it costs one small query, and only on the locked
+	 * state. An owned or removed module never asks.
+	 */
+	const carryover =
+		access === 'none'
+			? await withBusiness(event, async (ctx) =>
+					carryoverSummary(await loadCarryover(ctx.tx, ctx.business, ctx.access))
+				)
+			: null;
 
 	return {
 		module: {
@@ -38,6 +52,7 @@ export const load: PageServerLoad = async (event) => {
 			accent: row.accent
 		},
 		price,
-		access: moduleAccess(event, key)
+		carryover,
+		access
 	};
 };

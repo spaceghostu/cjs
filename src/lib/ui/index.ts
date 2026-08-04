@@ -56,6 +56,23 @@ export {
 
 export { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 
+export {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger
+} from '$lib/components/ui/dialog';
+
+/**
+ * Toasts. The undo affordance in T13 is one, and the design is specific that its dismissal
+ * window is generous and explicit — see `ModuleAddedToast`.
+ */
+export { Toaster } from '$lib/components/ui/sonner';
+
 /** Money and quantity rendering from T03. Screens never format an amount by hand. */
 export { Amount, Blank, Qty, StatDelta, UnitPrice } from '$lib/components/money';
 

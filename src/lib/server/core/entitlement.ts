@@ -15,11 +15,11 @@
  * into *never owned*, and getting that back later means reconstructing history nobody kept.
  * Hence a period with a start and an optional end, never a flag.
  *
- * WHAT THIS FILE OWNS, AND WHAT T10 ADDS
- * --------------------------------------
- * The shape, the arithmetic and the failure mode are here and fully tested. The DATA — the
- * catalogue, prices, and the `billing_subscription` rows that produce the periods — is T10.
- * `loadSubscriptionPeriods` below is the single seam where that lands.
+ * WHAT THIS FILE OWNS
+ * -------------------
+ * The shape, the arithmetic and the failure mode. The periods themselves come from
+ * `billing_subscription` (see `schema/billing.ts`), and the add/remove/undo that opens and
+ * closes them lives in `modules/subscribe.ts` — this file only ever reads.
  *
  * The keys themselves moved to `$lib/core/modules/catalogue` when the shell landed: the
  * sidebar and the bottom nav are client components and cannot import `$lib/server`, so a
@@ -28,8 +28,9 @@
  * a route wants it to — entitlement is what every route asks about.
  */
 import { error } from '@sveltejs/kit';
-import { sql } from 'drizzle-orm';
+import { isNull } from 'drizzle-orm';
 import type { Tx } from './db/tx';
+import { subscription } from './db/schema/billing';
 import {
 	MODULE_KEYS,
 	NO_ACCESS,
@@ -153,52 +154,29 @@ export async function loadAccess(tx: Tx, now: Date = new Date()): Promise<Access
 }
 
 /**
- * THE SEAM FOR T10.
+ * The periods, from `billing_subscription`.
  *
- * When `billing_subscription` exists this becomes a `select module_key, started_at, ended_at
- * from billing_subscription order by started_at` and nothing else in this file changes.
+ * No `where business_id = …`: the table is a tenant table, so `tenant_isolation` has already
+ * decided whose rows these are. Adding a predicate would be a second, weaker answer to a
+ * question the database has answered — and one that could drift.
  *
- * Until then it returns no periods, and no periods is the honest answer rather than a stub:
- * no module has been built, so every module route is correctly the locked state. The query
- * is written out below rather than described, so the change is a deletion.
+ * VOIDED PERIODS ARE EXCLUDED. Undo (T13) marks a period as never having counted rather than
+ * closing it, precisely so that it does not land here as a closed period and hand somebody a
+ * read-only archive of a module they had for four seconds. See `schema/billing.ts`.
  */
 async function loadSubscriptionPeriods(tx: Tx): Promise<SubscriptionPeriod[]> {
-	const hasTable = await tableExists(tx, 'billing_subscription');
-	if (!hasTable) return [];
+	const rows = await tx
+		.select({
+			moduleKey: subscription.moduleKey,
+			startedAt: subscription.startedAt,
+			endedAt: subscription.endedAt
+		})
+		.from(subscription)
+		.where(isNull(subscription.voidedAt))
+		.orderBy(subscription.startedAt);
 
-	const { rows } = await tx.execute<{
-		module_key: string;
-		started_at: Date;
-		ended_at: Date | null;
-	}>(sql`
-		select module_key, started_at, ended_at
-		  from billing_subscription
-		 order by started_at
-	`);
-
-	return rows
-		.filter((row) => isModuleKey(row.module_key))
-		.map((row) => ({
-			moduleKey: row.module_key as ModuleKey,
-			startedAt: row.started_at,
-			endedAt: row.ended_at
-		}));
-}
-
-/**
- * Asked once per process, not once per request.
- *
- * The alternative to this check is `entitlement.ts` throwing "relation does not exist" on
- * every request until T10 lands, which would make the floor untestable in the meantime.
- * T10 deletes both this function and its call.
- */
-let billingTablePresent: boolean | null = null;
-
-async function tableExists(tx: Tx, name: string): Promise<boolean> {
-	if (billingTablePresent !== null) return billingTablePresent;
-	const { rows } = await tx.execute<{ present: boolean }>(sql`
-		select to_regclass(${`public.${name}`}) is not null as present
-	`);
-	billingTablePresent = rows[0]?.present ?? false;
-	return billingTablePresent;
+	// A key the catalogue no longer knows is skipped rather than thrown on. The CHECK
+	// constraint makes it near-impossible, and a retired module must not be able to take
+	// somebody's whole dashboard down on the way out.
+	return rows.filter((row) => isModuleKey(row.moduleKey)) as SubscriptionPeriod[];
 }

@@ -29,6 +29,13 @@
       "when": 1785762688880,
       "tag": "0003_platform",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785833009196,
+      "tag": "0004_absurd_jubilee",
+      "breakpoints": true
     }
   ]
 }

@@ -7,17 +7,28 @@
  * client-importable file would have to be a raw number, and a raw number is exactly what the
  * money engine exists to prevent.
  *
- * WHAT T10 STILL ADDS
- * -------------------
- * `billing_subscription`, and with it real periods, proration (T12) and the switcher's
- * add/remove (T11). This file already answers the one question the SHELL asks — "what is
- * this business paying a month?" — and answers it from the access map, so when subscriptions
- * become real the total starts moving without the sidebar changing.
+ * PRICES HERE, PERIODS ELSEWHERE
+ * ------------------------------
+ * A price is a property of the CATALOGUE — what a module costs today. What a particular
+ * business agreed to pay is a property of its subscription period, snapshotted on the row
+ * (`schema/billing.ts`), and read through `modules/subscriptions.ts`. The two are kept apart
+ * deliberately: changing a catalogue price must never re-price a period already charged.
+ *
+ * Everything below is derived from an access map, which is why one function produces the
+ * running total for the sidebar, the switcher and the settings page alike.
  */
-import { MODULES, moduleRow, type ModuleKey } from '$lib/core/modules/catalogue';
+import {
+	CATEGORY_LABELS,
+	MODULES,
+	MODULE_CATEGORIES,
+	moduleRow,
+	modulesInCategory,
+	type ModuleCategory,
+	type ModuleKey
+} from '$lib/core/modules/catalogue';
 import { ZAR, sumMoney, type Money } from '$lib/core/money';
 import { toMoney } from '../db/map';
-import type { AccessMap } from '../entitlement';
+import type { Access, AccessMap } from '../entitlement';
 
 /**
  * The design's own monthly prices, in cents.
@@ -79,6 +90,54 @@ export function monthlyTotal(access: AccessMap): Money {
 	});
 
 	return sumMoney(ZAR, owned);
+}
+
+/**
+ * THE CATALOGUE AS THE SWITCHER RENDERS IT — categorised, priced, with this business's
+ * access already on every row.
+ *
+ * Built here rather than in the component so that the sidebar's total, the switcher's list
+ * and the settings page all read one function. The category order is `MODULE_CATEGORIES`,
+ * which is the design's order and is stored rather than sorted.
+ *
+ * A category with nothing purchasable in it is omitted rather than rendered as a heading
+ * over nothing — the same rule `sidebarGroups` follows.
+ */
+export type CatalogueEntry = PricedModule & { readonly access: Access };
+
+export type CatalogueGroup = {
+	readonly category: ModuleCategory;
+	readonly label: string;
+	readonly modules: readonly CatalogueEntry[];
+};
+
+export function catalogueGroups(access: AccessMap): readonly CatalogueGroup[] {
+	const priced = new Map(purchasableModules().map((m) => [m.key, m]));
+
+	return MODULE_CATEGORIES.flatMap((category) => {
+		const modules = modulesInCategory(category).flatMap((row) => {
+			const entry = priced.get(row.key);
+			return entry ? [{ ...entry, access: access[row.key] }] : [];
+		});
+
+		return modules.length > 0 ? [{ category, label: CATEGORY_LABELS[category], modules }] : [];
+	});
+}
+
+/** How many modules the business has right now. The switcher's subtitle counts these. */
+export function ownedCount(access: AccessMap): number {
+	return MODULES.filter((m) => access[m.key] === 'write').length;
+}
+
+/**
+ * What the total WOULD be with one module added or removed.
+ *
+ * The confirmation shows the new total and never a delta, so the new total has to be a real
+ * figure computed the same way the current one is — not `current + price`, which is the same
+ * arithmetic done in a second place and free to drift from it.
+ */
+export function totalWith(access: AccessMap, moduleKey: ModuleKey, next: Access): Money {
+	return monthlyTotal(Object.freeze({ ...access, [moduleKey]: next }));
 }
 
 /** Re-exported so a server caller has one import for "the catalogue". */
