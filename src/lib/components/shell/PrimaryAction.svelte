@@ -10,11 +10,14 @@
 	 * The fade is `pointer-events-none` and the container is not, so the strip above the
 	 * button never eats a tap meant for the row underneath it.
 	 *
-	 * WHAT IT DOES NOT DO
-	 * -------------------
-	 * Guarantee the last row is reachable. That is `pb-[calc(...)]` on the scrolling content,
-	 * which is why `PRIMARY_ACTION_CLEARANCE` is exported rather than hardcoded in two places
-	 * that could drift.
+	 * WHY THE LAST ROW STAYS READABLE
+	 * ------------------------------
+	 * `sticky`, not `fixed`. A sticky element still occupies its place in the flow, so at the
+	 * bottom of the scroll it comes to rest AFTER the last row rather than on top of it —
+	 * there is no clearance padding to keep in sync with this component's height, and no way
+	 * for the two to drift. Asserted at 390 × 844 in `shell.mobile.spec.ts`.
+	 *
+	 * It must therefore be the last child of the scrolling element, not a sibling of it.
 	 */
 	import { Button } from '$lib/ui';
 	import type { Snippet } from 'svelte';

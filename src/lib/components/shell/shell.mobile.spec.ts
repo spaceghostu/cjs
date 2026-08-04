@@ -6,10 +6,11 @@
  * a computed height and a scrollWidth are facts about layout, and a unit test that asserted
  * the CLASS `h-11` would pass while a parent's `line-height` quietly made the row 38px.
  *
- * The three:
+ * The four:
  *   1. Every touch target is at least 44px.
  *   2. Nothing overflows 390px horizontally.
  *   3. The bottom nav renders five items and no more, whatever the business owns.
+ *   4. The primary action comes to rest below the last row, never over it.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { createRawSnippet, mount, unmount, type Component } from 'svelte';
@@ -25,6 +26,8 @@ import PrimaryAction from './PrimaryAction.svelte';
 /** The design's minimum. Apple's HIG and the WCAG 2.2 target-size floor agree on it. */
 const TOUCH_MINIMUM = 44;
 const PHONE_WIDTH = 390;
+/** The design's reference frame, and the height the `mobile` project runs Chromium at. */
+const PHONE_HEIGHT = 844;
 
 function owning(...keys: ModuleKey[]): AccessMap {
 	return { ...NO_ACCESS, ...Object.fromEntries(keys.map((k) => [k, 'write' as const])) };
@@ -47,6 +50,41 @@ function render<P extends Record<string, unknown>>(component: Component<P>, prop
 	document.body.style.margin = '0';
 	document.body.append(target);
 	instance = mount(component, { target, props }) as Record<string, unknown>;
+	return target;
+}
+
+/**
+ * The primary action in the frame it actually lives in: last child of the ONE element that
+ * scrolls, under a list long enough to need scrolling.
+ *
+ * The scroller FILLS THE VIEWPORT, as `<main>` does in the shell, and that detail is the
+ * test. In a short scroller floating in a tall page a `fixed` button parks at the bottom of
+ * the WINDOW, hundreds of pixels clear of the list, and an overlap assertion passes on the
+ * broken thing. Full height is the only geometry where `fixed` and `sticky` disagree.
+ */
+const ROW_COUNT = 40;
+const ROW_HEIGHT = 40;
+
+function mountInScroller(): HTMLElement {
+	target = document.createElement('div');
+	target.style.cssText = `width:${PHONE_WIDTH}px;height:${PHONE_HEIGHT}px;overflow-y:auto`;
+	document.body.style.margin = '0';
+	document.body.append(target);
+
+	for (let i = 0; i < ROW_COUNT; i++) {
+		const row = document.createElement('div');
+		row.style.height = `${ROW_HEIGHT}px`;
+		if (i === ROW_COUNT - 1) row.dataset.lastRow = '';
+		target.append(row);
+	}
+
+	instance = mount(PrimaryAction, {
+		target,
+		props: {
+			href: '/invoicing/new',
+			children: createRawSnippet(() => ({ render: () => '<span>Send invoice</span>' }))
+		}
+	}) as Record<string, unknown>;
 	return target;
 }
 
@@ -140,5 +178,31 @@ describe('primary action', () => {
 		const button = root.querySelector('a, button');
 		expect(button).not.toBeNull();
 		expect(button!.getBoundingClientRect().height).toBeGreaterThanOrEqual(TOUCH_MINIMUM);
+	});
+
+	/**
+	 * The criterion the component's `sticky` exists to satisfy. A `fixed` button would pass
+	 * every other assertion in this file and still sit on top of the last invoice in the list
+	 * — which is the one you scrolled all that way to read.
+	 *
+	 * Scrolled to the very bottom, because that is the only position where the two can
+	 * collide: anywhere above it the button is stuck to the viewport edge with more content
+	 * still to come, and overlapping there is the point.
+	 */
+	it('comes to rest below the last row rather than over it', () => {
+		const scroller = mountInScroller();
+		scroller.scrollTop = scroller.scrollHeight;
+
+		const lastRow = scroller.querySelector('[data-last-row]');
+		const button = scroller.querySelector('a, button');
+		expect(lastRow).not.toBeNull();
+		expect(button).not.toBeNull();
+
+		// A pixel of slack: sub-pixel layout makes an exact comparison a flake waiting to
+		// happen, and one pixel of overlap is not a row anyone would call obscured. The
+		// failure this guards against is the button's full 50px sitting over the row.
+		expect(lastRow!.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+			button!.getBoundingClientRect().top + 1
+		);
 	});
 });

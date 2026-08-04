@@ -30,3 +30,9 @@ storybook-static
 
 # Test coverage output
 coverage/
+
+
+.vitest-attachments
+
+
+**/_screenshots_/
