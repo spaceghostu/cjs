@@ -36,3 +36,4 @@ coverage/
 
 
 **/_screenshots_/
+.env*

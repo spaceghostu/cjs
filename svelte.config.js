@@ -1,4 +1,5 @@
-import adapter from '@sveltejs/adapter-node';
+import adapterNode from '@sveltejs/adapter-node';
+import adapterVercel from '@sveltejs/adapter-vercel';
 
 /**
  * SvelteKit configuration.
@@ -19,12 +20,22 @@ const config = {
 	},
 
 	kit: {
-		// Coolify runs a long-lived Node process.
+		// Coolify is the default target and runs a long-lived Node process. Vercel sets
+		// VERCEL=1 in its build environment, and adapter-node's output (a Node server in
+		// `build/`) is not something Vercel can serve — it looks for `.vercel/output/` and
+		// otherwise fails the build with "No Output Directory named public".
 		//
-		// ORIGIN must be set in the deployment environment. Without it adapter-node refuses
-		// every form POST with "Cross-site POST form submissions are forbidden", which would
-		// break every commit path in the product — quotes, invoices, payments, everything.
-		adapter: adapter(),
+		// Both targets run Node with real TCP sockets, so the driver constraint documented in
+		// `$lib/server/core/db/client.ts` still holds: node-postgres keeps transactions and
+		// `SET LOCAL`, which RLS session context depends on. That argument is against
+		// stateless HTTP/edge drivers, not against Vercel's Node functions.
+		//
+		// ORIGIN must be set in the deployment environment for adapter-node. Without it
+		// adapter-node refuses every form POST with "Cross-site POST form submissions are
+		// forbidden", which would break every commit path in the product — quotes, invoices,
+		// payments, everything. adapter-vercel derives the origin from request headers and
+		// ignores ORIGIN entirely.
+		adapter: process.env.VERCEL ? adapterVercel() : adapterNode(),
 
 		typescript: {
 			config: (c) => {
