@@ -226,9 +226,15 @@ export async function cleanupFixtures(): Promise<void> {
 			try {
 				// Even as owner. FORCE ROW LEVEL SECURITY means no context, no rows.
 				await client.query('select set_config($1, $2, true)', ['cjs.business_id', businessId]);
+				// Foreign keys decide the order: lines before their quote, quotes before the
+				// customer they point at, everything before the business.
 				for (const table of [
 					'audit.row_change',
 					'billing_subscription',
+					'quoting_quote_event',
+					'quoting_quote_line',
+					'quoting_quote',
+					'quoting_setting',
 					'core_document_number',
 					'core_customer',
 					'core_member',

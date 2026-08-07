@@ -27,8 +27,15 @@ const BUSINESS_COOKIE = 'cjs_business';
 /**
  * Routes that must work before a business exists — otherwise a signed-in person with no
  * business is redirected to onboarding by a guard that onboarding itself trips.
+ *
+ * `/q` is on this list for a different reason from the rest of it. It is the shared quote page
+ * (T18), and the person reading it is a CLIENT: they have no account, and if they happen to
+ * also be a user of this product somewhere else, their own business has nothing to do with the
+ * document they were sent. Resolving a tenant for them would be meaningless at best, and at
+ * worst would put a business context on a request that is deliberately bounded by a share
+ * token instead — see `$lib/server/core/share.ts`.
  */
-const PRE_BUSINESS_PATHS = ['/onboarding', '/sign-in', '/sign-out', '/api/auth'];
+const PRE_BUSINESS_PATHS = ['/onboarding', '/sign-in', '/sign-out', '/api/auth', '/q'];
 
 function isPreBusiness(pathname: string): boolean {
 	return PRE_BUSINESS_PATHS.some(

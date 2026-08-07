@@ -1,0 +1,42 @@
+       Y        X  ALIGN  FONT      SIZE  INK       TEXT
+   52.00    48.00  left   semibold    14  ink       THORNHILL JOINERY
+   52.00   547.28  right  regular     11  inkMuted  TAX INVOICE
+   68.00   547.28  right  mono        13  ink       INV-1042
+   72.00    48.00  left   regular     11  inkMuted  14 Sir Lowry Road
+   89.60    48.00  left   regular     11  inkMuted  Cape Town 8001
+  107.20    48.00  left   regular     11  inkMuted  VAT 4890271563 · 021 447 2210
+  154.80    48.00  left   regular     10  inkMuted  BILLED TO
+  168.80    48.00  left   regular     13  ink       Meridian Developments
+  182.80    48.00  left   regular     11  inkMuted  9 Buitengracht Street, Cape Town
+  154.80   547.28  right  regular     10  inkMuted  DUE
+  168.80   547.28  right  regular     13  ink       18 August 2026
+  214.80    48.00  left   regular     10  inkMuted  DESCRIPTION
+  214.80   443.28  right  regular     10  inkMuted  QTY
+  214.80   547.28  right  regular     10  inkMuted  AMOUNT
+  239.80    48.00  left   regular     12  ink       Counter and bar top
+  239.80   443.28  right  mono        12  ink       1
+  239.80   547.28  right  mono        12  ink       16 400,00
+  261.80    48.00  left   regular     12  ink       Shelving unit
+  261.80   443.28  right  mono        12  ink       2
+  261.80   547.28  right  mono        12  ink       4 600,00
+  283.80    48.00  left   regular     12  ink       Fitting and finishing
+  283.80   443.28  right  mono        12  ink       1
+  283.80   547.28  right  mono        12  ink       0,00
+  310.80   347.28  left   regular     11  inkMuted  Before VAT
+  310.80   547.28  right  mono        11  ink       21 000,00
+  326.80   347.28  left   regular     11  inkMuted  VAT 15%
+  326.80   547.28  right  mono        11  ink       3 150,00
+  353.80   347.28  left   regular     11  ink       Amount due
+  353.80   547.28  right  mono        16  ink       24 150,00
+  759.89    48.00  left   regular     10  inkMuted  Standard Bank · Acc 0271 553 810 · Branch 020909
+  776.89    48.00  left   regular     10  inkMuted  Thank you — it was a pleasure working with you.
+  759.89   547.28  right  regular     10  inkMuted  Page 1 of 1
+
+RULES
+  138.80    48.00  rule   rule × 499.28
+  226.80    48.00  rule   rule × 499.28
+  248.80    48.00  rule   ruleLight × 499.28
+  270.80    48.00  rule   ruleLight × 499.28
+  292.80    48.00  rule   ruleLight × 499.28
+  338.80   347.28  rule   rule × 200.00
+  747.89    48.00  rule   rule × 499.28

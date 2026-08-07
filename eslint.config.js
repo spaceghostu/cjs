@@ -35,6 +35,10 @@ const architectureZones = [
 		ignores: [
 			'src/lib/server/core/db/**',
 			'src/lib/server/core/ctx.ts',
+			// The second door, and the only other one: the public quote page, for a client who
+			// is not a user. Kept as its own file so the blast radius of the one
+			// unauthenticated path in the product is visible in the file list.
+			'src/lib/server/core/share.ts',
 			'src/lib/server/auth.ts',
 			'src/hooks.server.ts'
 		],

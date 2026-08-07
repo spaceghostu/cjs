@@ -105,3 +105,49 @@ export async function fanoutSettled<T, R>(
 
 	return results;
 }
+
+/**
+ * The same bound, one promise PER ITEM rather than one for the batch.
+ *
+ * `fanoutSettled` answers when everything has answered, which is the wrong shape for a
+ * streamed page: Home sends each panel as it is ready, and a panel that reads two modules
+ * must not wait on the five it does not read. A single batch promise would re-introduce
+ * exactly the barrier the streaming exists to remove — the slowest module would set the
+ * arrival time of every panel on the screen.
+ *
+ * So the queue is still shared and still bounded, and each item's result is handed back the
+ * moment ITS task settles. Nothing here rejects: a task that throws resolves as `failed`,
+ * because an unhandled rejection on a promise nobody has awaited yet takes the process down
+ * rather than the panel.
+ */
+export function fanoutEach<T, R>(
+	items: readonly T[],
+	task: (item: T, index: number) => Promise<R>,
+	options: FanoutOptions = {}
+): readonly Promise<FanoutResult<R>>[] {
+	const slots = items.map(() => defer<FanoutResult<R>>());
+
+	// The batch promise is deliberately dropped: every outcome has already been delivered
+	// through a slot, and `fanoutSettled` does not reject.
+	void fanoutSettled(
+		items,
+		async (item, index) => {
+			try {
+				slots[index].settle({ status: 'ok', value: await task(item, index) });
+			} catch (error) {
+				slots[index].settle({ status: 'failed', error });
+			}
+		},
+		options
+	);
+
+	return slots.map((slot) => slot.promise);
+}
+
+function defer<T>(): { promise: Promise<T>; settle: (value: T) => void } {
+	let settle!: (value: T) => void;
+	const promise = new Promise<T>((resolve) => {
+		settle = resolve;
+	});
+	return { promise, settle };
+}

@@ -58,7 +58,7 @@ export {
 } from './proration';
 
 export type { ParseResult } from './parse';
-export { parseMoneyInput, parseQuantityInput, parseUnitPriceInput } from './parse';
+export { parseMoneyInput, parseQuantityInput, parseRateInput, parseUnitPriceInput } from './parse';
 
 export type { FormatOptions } from './format';
 export {

@@ -1,0 +1,43 @@
+       Y        X  ALIGN  FONT      SIZE  INK       TEXT
+   52.00    48.00  left   semibold    14  ink       THORNHILL JOINERY
+   52.00   547.28  right  regular     11  inkMuted  QUOTE
+   68.00   547.28  right  mono        13  ink       QT-1043
+   72.00    48.00  left   regular     11  inkMuted  14 Sir Lowry Road
+   89.60    48.00  left   regular     11  inkMuted  Cape Town 8001
+  107.20    48.00  left   regular     11  inkMuted  VAT 4890271563 · 021 447 2210
+  154.80    48.00  left   regular     10  inkMuted  PREPARED FOR
+  168.80    48.00  left   regular     13  ink       Fynbos Interiors
+  182.80    48.00  left   regular     11  inkMuted  Renske Malan
+  154.80   547.28  right  regular     10  inkMuted  VALID UNTIL
+  168.80   547.28  right  regular     13  ink       22 August 2026
+  214.80    48.00  left   regular     10  inkMuted  DESCRIPTION
+  214.80   447.28  right  regular     10  inkMuted  QTY
+  214.80   547.28  right  regular     10  inkMuted  AMOUNT
+  239.80    48.00  left   regular     12  ink       Solid oak kitchen island top, 2400 × 900, 40mm European oak,
+  257.80    48.00  left   regular     12  ink       oiled finish
+  239.80   447.28  right  mono        12  ink       1
+  239.80   547.28  right  mono        12  ink       24 800,00
+  279.80    48.00  left   regular     12  ink       Base cabinetry, oak veneer
+  279.80   447.28  right  mono        12  ink       1
+  279.80   547.28  right  mono        12  ink       8 600,00
+  301.80    48.00  left   regular     12  ink       Installation and finishing
+  301.80   447.28  right  mono        12  ink       1
+  301.80   547.28  right  mono        12  ink       9 000,00
+  328.80   347.28  left   regular     11  inkMuted  Before VAT
+  328.80   547.28  right  mono        11  ink       42 400,00
+  344.80   347.28  left   regular     11  inkMuted  VAT 15%
+  344.80   547.28  right  mono        11  ink       6 360,00
+  371.80   347.28  left   regular     11  ink       Total
+  371.80   547.28  right  mono        16  ink       48 760,00
+  759.89    48.00  left   regular     10  inkMuted  50% deposit to begin · balance on completion
+  776.89    48.00  left   regular     10  inkMuted  Banking details on acceptance
+  759.89   547.28  right  regular     10  inkMuted  Page 1 of 1
+
+RULES
+  138.80    48.00  rule   rule × 499.28
+  226.80    48.00  rule   rule × 499.28
+  266.80    48.00  rule   ruleLight × 499.28
+  288.80    48.00  rule   ruleLight × 499.28
+  310.80    48.00  rule   ruleLight × 499.28
+  356.80   347.28  rule   rule × 200.00
+  747.89    48.00  rule   rule × 499.28

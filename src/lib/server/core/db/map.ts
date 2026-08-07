@@ -31,7 +31,16 @@ import {
 } from '$lib/core/money';
 import { money, quantity, rate, unitPrice } from '$lib/core/money/ctor';
 import { toBrandColor, type BrandColor } from '$lib/components/theme/brand';
+import {
+	PRICING_MODES,
+	QUOTE_STATUSES,
+	TAX_ENGINES,
+	TAX_TREATMENTS,
+	type Quote,
+	type QuoteLine
+} from '$lib/core/quoting';
 import type { business, customer, member, MemberRole } from './schema/core';
+import type { quote, quoteLine } from './schema/quoting';
 
 /** What a numeric column can arrive as, depending on how it was queried. */
 export type NumericColumn = string | number | bigint;
@@ -179,6 +188,8 @@ export type Customer = {
 type BusinessRow = typeof business.$inferSelect;
 type MemberRow = typeof member.$inferSelect;
 type CustomerRow = typeof customer.$inferSelect;
+type QuoteRow = typeof quote.$inferSelect;
+type QuoteLineRow = typeof quoteLine.$inferSelect;
 
 function toAddress(row: {
 	addressLine1: string | null;
@@ -236,5 +247,132 @@ export function toCustomer(row: CustomerRow): Customer {
 		vatNumber: row.vatNumber,
 		address: toAddress(row),
 		archivedAt: row.archivedAt
+	};
+}
+
+// ── Quoting ─────────────────────────────────────────────────────────────────────────
+//
+// Quoting's rows map here rather than inside the module for one reason: this file is the
+// only door money may come through from the database, and a quote is nothing BUT money.
+// Putting `toQuoteLine` in `modules/quoting` would mean either a second import of
+// `money/ctor` — which ESLint refuses — or a module holding raw integers and hoping.
+
+/**
+ * A closed union, narrowed from a text column.
+ *
+ * The CHECK constraints make an unknown value nearly impossible, so reaching the throw means
+ * the row is corrupt or the code and the database have drifted apart. Both are worth failing
+ * loudly for: the alternative is a quote that silently prices itself under the wrong VAT
+ * engine, which is a wrong number on a document somebody signs.
+ */
+function narrow<T extends string>(value: string, allowed: readonly T[], what: string): T {
+	if ((allowed as readonly string[]).includes(value)) return value as T;
+	throw new RangeError(`unknown ${what} in row: ${JSON.stringify(value)}`);
+}
+
+/**
+ * Deposit terms, from the two columns that hold them.
+ *
+ * `deposit_single_form` guarantees at most one is set, so this reads as three cases rather
+ * than four. Neither set means the business asks for no deposit — which is a real answer, not
+ * a missing one, and `none` is what stops it printing as "R0,00 on acceptance".
+ */
+function toDeposit(row: { depositRatePpm: number | null; depositAmountCents: number | null }) {
+	if (row.depositRatePpm !== null)
+		return { kind: 'rate' as const, rate: toRate(row.depositRatePpm) };
+	if (row.depositAmountCents !== null) {
+		return { kind: 'amount' as const, amount: toMoney(row.depositAmountCents) };
+	}
+	return { kind: 'none' as const };
+}
+
+export function toQuoteLine(row: QuoteLineRow): QuoteLine {
+	return {
+		id: row.id,
+		position: row.position,
+		description: row.description,
+		provenance: row.provenance,
+		documentDescription: row.documentDescription,
+		qty: toQuantity(row.qtyE6),
+		unitPrice: toUnitPrice(row.unitPriceMicros, row.currency),
+		taxTreatment: narrow(row.taxTreatment, TAX_TREATMENTS, 'tax treatment'),
+		vatRate: toRate(row.vatRatePpm),
+		sourceItemId: row.sourceItemId
+	};
+}
+
+/**
+ * A quote and its lines.
+ *
+ * Lines arrive as a separate argument rather than being fetched here — nothing in this file
+ * talks to the database, which is what keeps it a pure unit under test. The caller has already
+ * filtered out archived lines and ordered them; this does not re-sort, because the order a
+ * document prints in is a decision the query made.
+ */
+export function toQuote(row: QuoteRow, lines: readonly QuoteLineRow[]): Quote {
+	return {
+		id: row.id,
+		status: narrow(row.status, QUOTE_STATUSES, 'quote status'),
+		number: row.numberFormatted,
+		customer: {
+			customerId: row.customerId,
+			name: row.customerName,
+			contactPerson: row.customerContactPerson,
+			email: row.customerEmail,
+			phone: row.customerPhone,
+			vatNumber: row.customerVatNumber,
+			addressLine1: row.customerAddressLine1,
+			addressLine2: row.customerAddressLine2,
+			city: row.customerCity,
+			postalCode: row.customerPostalCode,
+			country: row.customerCountry
+		},
+		sendTo: { name: row.sendToName, email: row.sendToEmail },
+		validUntil: row.validUntil,
+		deposit: toDeposit(row),
+		pricing: {
+			mode: narrow(row.pricingMode, PRICING_MODES, 'pricing mode'),
+			engine: narrow(row.taxEngine, TAX_ENGINES, 'tax engine'),
+			vatRate: toRate(row.vatRatePpm),
+			policy: row.vatPolicy
+		},
+		lines: lines.map(toQuoteLine),
+		// The save indicator's only input. `updated_at` is maintained by the `touch_updated_at`
+		// trigger, so it reflects what the database actually did — not what the server intended
+		// to do, and never an optimistic guess in the browser.
+		savedAt: row.updatedAt,
+		sentAt: row.sentAt
+	};
+}
+
+/**
+ * The totals a sent quote froze, if it has been sent.
+ *
+ * Returned as a triple rather than three loose reads so a caller cannot pick up two of the
+ * three. `snapshot_complete` makes a partial row unstorable; this makes a partial read
+ * unexpressible.
+ */
+export type QuoteSnapshot = {
+	subtotal: Money;
+	tax: Money;
+	total: Money;
+	at: Date;
+};
+
+export function toQuoteSnapshot(row: QuoteRow): QuoteSnapshot | null {
+	if (
+		row.snapshotSubtotalCents === null ||
+		row.snapshotTaxCents === null ||
+		row.snapshotTotalCents === null ||
+		row.snapshotAt === null
+	) {
+		return null;
+	}
+
+	return {
+		subtotal: toMoney(row.snapshotSubtotalCents, row.currency),
+		tax: toMoney(row.snapshotTaxCents, row.currency),
+		total: toMoney(row.snapshotTotalCents, row.currency),
+		at: row.snapshotAt
 	};
 }

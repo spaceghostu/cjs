@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
-import { parseMoneyInput, parseQuantityInput, parseUnitPriceInput } from './parse';
+import { parseMoneyInput, parseQuantityInput, parseRateInput, parseUnitPriceInput } from './parse';
 import { formatQty, formatUnitPrice, formatZar, moneyToDecimalString } from './format';
-import { money } from './ctor';
+import { money, percent } from './ctor';
 
 const cents = (raw: string) => {
 	const r = parseMoneyInput(raw);
@@ -205,5 +205,57 @@ describe('parse/format round-trip', () => {
 			}),
 			{ numRuns: 2000 }
 		);
+	});
+});
+
+describe('percentages', () => {
+	/**
+	 * The fourth door. A deposit of "50% to start" is a number a person types, and without a
+	 * sanctioned path it would either need a constructor (which ESLint refuses) or the server
+	 * would have to trust an integer sent by a browser.
+	 */
+	it('reads a percentage the way somebody would write one', () => {
+		expect(parseRateInput('50')).toEqual({ ok: true, value: percent(50) });
+		expect(parseRateInput('50%')).toEqual({ ok: true, value: percent(50) });
+		expect(parseRateInput(' 50 % ')).toEqual({ ok: true, value: percent(50) });
+		expect(parseRateInput('12,5')).toEqual({ ok: true, value: percent(12.5) });
+		expect(parseRateInput('12.5')).toEqual({ ok: true, value: percent(12.5) });
+		expect(parseRateInput('0')).toEqual({ ok: true, value: percent(0) });
+		expect(parseRateInput('100')).toEqual({ ok: true, value: percent(100) });
+	});
+
+	it('holds four decimal places of percent — one part per million', () => {
+		const parsed = parseRateInput('0,0001');
+		expect(parsed.ok && parsed.value.ppm).toBe(1);
+
+		expect(parseRateInput('0,00001')).toEqual({
+			ok: false,
+			message: 'A percentage can have at most four decimals.'
+		});
+	});
+
+	/**
+	 * Bounded to 0–100, unlike `rate()` itself.
+	 *
+	 * `rate()` is deliberately unbounded — a 150% markup is a legitimate rate — but every
+	 * percentage a PERSON types into this product is a share of something: a deposit, a
+	 * discount, a VAT rate. This door is not the one such a value should come through.
+	 */
+	it('refuses a share that is not one', () => {
+		expect(parseRateInput('-10')).toEqual({
+			ok: false,
+			message: 'A percentage cannot be negative.'
+		});
+		expect(parseRateInput('101')).toEqual({ ok: false, message: 'That is more than 100%.' });
+		expect(parseRateInput('(50)')).toEqual({
+			ok: false,
+			message: 'A percentage cannot be negative.'
+		});
+	});
+
+	it('refuses what is not a number at all', () => {
+		expect(parseRateInput('')).toEqual({ ok: false, message: 'Enter an amount.' });
+		expect(parseRateInput('%')).toEqual({ ok: false, message: 'Enter an amount.' });
+		expect(parseRateInput('half').ok).toBe(false);
 	});
 });

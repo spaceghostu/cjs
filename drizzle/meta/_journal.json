@@ -36,6 +36,20 @@
       "when": 1785833009196,
       "tag": "0004_absurd_jubilee",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785838140074,
+      "tag": "0005_quoting",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785839970399,
+      "tag": "0006_quote_sharing",
+      "breakpoints": true
     }
   ]
 }

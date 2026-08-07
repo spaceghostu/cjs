@@ -167,6 +167,39 @@ export function runAsUser<T>(userId: string, fn: (tx: Tx) => Promise<T>): Promis
 	});
 }
 
+/**
+ * THE ONE QUERY A PERSON WHO IS NOT A USER CAN CAUSE.
+ *
+ * A client opens `/q/<token>` and reads a quote. They have no account, no session and no
+ * membership, so `runScoped` has no business id to give and `runAsUser` has no user.
+ *
+ * The tempting shortcuts are both holes in the floor: look the token up on an unscoped
+ * connection, or resolve the tenant and then open a normal scoped transaction. Either one
+ * gives an unauthenticated request the reach of a whole business, with only the code's good
+ * behaviour between it and every other document.
+ *
+ * So this closes the loop inside the model, the same way `member_sees_own_membership` does for
+ * sign-in. It sets `cjs.share_token` and NOTHING ELSE — no business id, no user. The
+ * `document_share` policies in `0006_quote_sharing.sql` then admit exactly four things: the one
+ * quote whose token hash matches, its lines, its customer and its business. Every other table,
+ * and every other row of those four, still evaluates `business_id = NULL` and returns nothing.
+ *
+ * The reach of this function is therefore a property of the DATABASE rather than of the route
+ * that calls it. `quote-sharing.test.ts` attempts the traversal and gets zero rows.
+ *
+ * SELECT ONLY. Accepting or declining is a write, and writes still go through
+ * `tenant_isolation` — see `modules/quoting/accept.ts`, which resolves the tenant here and
+ * then performs the one bounded update as that tenant.
+ *
+ * @internal Used by the public quote page and by nothing else.
+ */
+export function runWithShareToken<T>(tokenHash: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
+	return unsafeDb.transaction(async (tx) => {
+		await tx.execute(sql`select set_config('cjs.share_token', ${tokenHash}, true)`);
+		return fn(tx as Tx);
+	});
+}
+
 /** For graceful shutdown and for integration tests. */
 export function closePool(): Promise<void> {
 	return pool.end();

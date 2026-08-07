@@ -4,7 +4,7 @@
  * mark is what must never exceed the bound.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { fanout, fanoutBound, fanoutSettled } from './fanout';
+import { fanout, fanoutBound, fanoutEach, fanoutSettled } from './fanout';
 
 /** A task that holds a slot until released, recording the peak concurrency it observed. */
 function tracker() {
@@ -157,5 +157,58 @@ describe('fanoutSettled', () => {
 		const t = tracker();
 		await fanoutSettled([1, 2, 3], (n) => t.task(n), { bound: 0 });
 		expect(t.peak).toBe(1);
+	});
+});
+
+describe('fanoutEach', () => {
+	it('hands each result back as it settles, not when the batch does', async () => {
+		// The whole reason this exists: Home streams a panel per module, and a panel that
+		// reads two modules must not wait on the five it does not read.
+		let releaseSlow!: () => void;
+		const slow = new Promise<void>((resolve) => {
+			releaseSlow = resolve;
+		});
+
+		const [fast, blocked] = fanoutEach([1, 2], async (n) => {
+			if (n === 2) await slow;
+			return n * 10;
+		});
+
+		expect(await fast).toEqual({ status: 'ok', value: 10 });
+
+		releaseSlow();
+		expect(await blocked).toEqual({ status: 'ok', value: 20 });
+	});
+
+	it('never rejects, however a task fails', async () => {
+		// An unhandled rejection on a promise nobody has awaited yet takes the process down
+		// rather than the panel.
+		const [failed, fine] = fanoutEach(['inventory', 'quoting'], async (key) => {
+			if (key === 'inventory') throw new Error('unreachable');
+			return key;
+		});
+
+		await expect(failed).resolves.toEqual({ status: 'failed', error: expect.any(Error) });
+		await expect(fine).resolves.toEqual({ status: 'ok', value: 'quoting' });
+	});
+
+	it('still respects the bound', async () => {
+		const t = tracker();
+		const results = fanoutEach(
+			Array.from({ length: 10 }, (_, i) => i),
+			(n) => t.task(n),
+			{ bound: 2 }
+		);
+
+		await Promise.all(results);
+		expect(t.peak).toBeLessThanOrEqual(2);
+	});
+
+	it('returns one promise per item, in input order', () => {
+		expect(fanoutEach([1, 2, 3], async (n) => n)).toHaveLength(3);
+	});
+
+	it('has nothing to do with an empty list', async () => {
+		expect(await Promise.all(fanoutEach([], async () => 1))).toEqual([]);
 	});
 });

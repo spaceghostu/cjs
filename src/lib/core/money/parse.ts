@@ -34,12 +34,13 @@
  * what someone typed into a different number is the defect class the brief calls
  * unacceptable.
  */
-import { money, quantity, unitPrice } from './ctor';
+import { money, quantity, rate, unitPrice } from './ctor';
 import {
 	MAX_CENTS,
 	type CurrencyCode,
 	type Money,
 	type Quantity,
+	type Rate,
 	type UnitPrice,
 	ZAR
 } from './types';
@@ -174,4 +175,35 @@ export function parseQuantityInput(raw: string): ParseResult<Quantity> {
 	const e6 = toScaledInteger(n.value, 6, 'A quantity can have at most six decimals.');
 	if (!e6.ok) return e6;
 	return ok(quantity(e6.value));
+}
+
+/**
+ * A PERCENTAGE somebody typed. "50" or "50%" or "12,5" -> Rate.
+ *
+ * The fourth door, and it exists for the same reason the other three do: a deposit of "50% to
+ * start" is a number a person enters, and without a sanctioned path they would either be given
+ * a constructor (which ESLint refuses, correctly) or the field would send a raw integer the
+ * server has to trust.
+ *
+ * PERCENT IN, PARTS PER MILLION OUT. `Rate` counts in ppm, so 50% is 500 000 — the shift of
+ * four decimal places happens here, once, and `toScaledInteger` does it exactly rather than by
+ * multiplying a float by 10 000.
+ *
+ * Bounded to 0–100. Every rate a person types into this product is a share of something:
+ * a deposit, a discount, a VAT rate. `rate()` itself is deliberately unbounded (a 150% markup
+ * is a legitimate rate), and this door is not the one such a value should come through.
+ */
+export function parseRateInput(raw: string): ParseResult<Rate> {
+	const n = normalise(raw.replace('%', ''));
+	if (!n.ok) return n;
+
+	// Four decimal places of percent is one part per million, which is the finest a `Rate`
+	// can hold — and finer than anything a deposit or a discount is ever expressed in.
+	const ppm = toScaledInteger(n.value, 4, 'A percentage can have at most four decimals.');
+	if (!ppm.ok) return ppm;
+
+	if (ppm.value < 0) return fail('A percentage cannot be negative.');
+	if (ppm.value > 1_000_000) return fail('That is more than 100%.');
+
+	return ok(rate(ppm.value));
 }

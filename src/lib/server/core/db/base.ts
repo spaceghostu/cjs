@@ -53,24 +53,30 @@ export function timestamps() {
 	};
 }
 
+/*
+ * Each of the four takes an OPTIONAL column name. Drizzle derives one from the property
+ * otherwise, and its camel-to-snake pass reads `qtyE6` as `qty_e_6` — a column name nobody
+ * would choose, in a table people will be reading in psql for years. Naming it is one word.
+ */
+
 /** Money, in integer cents. R1 234.56 -> 123456. */
-export function cents() {
-	return bigint({ mode: 'number' });
+export function cents(name?: string) {
+	return name ? bigint(name, { mode: 'number' }) : bigint({ mode: 'number' });
 }
 
 /** A unit price, in millionths of a rand. R33.333333/unit -> 33333333. */
-export function micros() {
-	return bigint({ mode: 'number' });
+export function micros(name?: string) {
+	return name ? bigint(name, { mode: 'number' }) : bigint({ mode: 'number' });
 }
 
 /** A quantity, in millionths of a unit. 2.5 hours -> 2500000. */
-export function qtyE6() {
-	return bigint({ mode: 'number' });
+export function qtyE6(name?: string) {
+	return name ? bigint(name, { mode: 'number' }) : bigint({ mode: 'number' });
 }
 
 /** A ratio, in parts per million. 15% -> 150000. */
-export function ppm() {
-	return bigint({ mode: 'number' });
+export function ppm(name?: string) {
+	return name ? bigint(name, { mode: 'number' }) : bigint({ mode: 'number' });
 }
 
 /**
