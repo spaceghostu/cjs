@@ -37,3 +37,9 @@ coverage/
 
 **/_screenshots_/
 .env*
+
+# Vendored agent skills, installed as a side effect of `vercel integration add neon`.
+# Third-party copies pinned by skills-lock.json — reinstallable, not ours to version.
+.agents/
+.claude/skills/
+skills-lock.json
