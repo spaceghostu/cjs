@@ -22,6 +22,8 @@
 	let sending = $state(false);
 	let sendForm: HTMLFormElement | null = $state(null);
 	let addForm: HTMLFormElement | null = $state(null);
+	let invoiceForm: HTMLFormElement | null = $state(null);
+	let makingInvoice = $state(false);
 </script>
 
 <svelte:head>
@@ -111,6 +113,24 @@
 		<input type="hidden" name="module" value="invoicing" />
 	</form>
 
+	<!--
+		"Turn it into an invoice" — a real POST, because it creates a document. Progressively
+		enhanced, and it redirects to the new draft.
+	-->
+	<form
+		bind:this={invoiceForm}
+		method="POST"
+		action="?/makeInvoice"
+		class="hidden"
+		use:enhance={() => {
+			makingInvoice = true;
+			return async ({ update }) => {
+				await update();
+				makingInvoice = false;
+			};
+		}}
+	></form>
+
 	<SentQuote
 		document={data.document}
 		status={data.status}
@@ -121,6 +141,9 @@
 		invoicingOwned={data.invoicingOwned}
 		invoicingPrice={data.invoicingPrice}
 		newTotal={data.newTotal}
+		existingInvoice={data.existingInvoice}
+		{makingInvoice}
 		onaddinvoicing={() => addForm?.requestSubmit()}
+		onmakeinvoice={() => invoiceForm?.requestSubmit()}
 	/>
 {/if}

@@ -20,22 +20,32 @@
 	 * It must therefore be the last child of the scrolling element, not a sibling of it.
 	 */
 	import { Button } from '$lib/ui';
+	import { cn } from '$lib/utils';
 	import type { Snippet } from 'svelte';
 
 	let {
 		href,
 		onclick,
+		disabled = false,
+		class: className,
 		children
 	}: {
 		href?: string;
 		onclick?: () => void;
+		disabled?: boolean;
+		/**
+		 * For the caller that needs to hide it on a wider screen. It has to land on THIS element
+		 * rather than on a wrapper: a `sticky` child inside a wrapper only as tall as itself has
+		 * nowhere to stick to, and would silently behave as though it were static.
+		 */
+		class?: string;
 		children: Snippet;
 	} = $props();
 </script>
 
-<div class="pointer-events-none sticky right-0 bottom-0 left-0 z-20">
+<div class={cn('pointer-events-none sticky right-0 bottom-0 left-0 z-20', className)}>
 	<div class="h-10 bg-gradient-to-b from-transparent to-surface-base"></div>
 	<div class="pointer-events-auto bg-surface-base px-4 pb-3">
-		<Button {href} {onclick} size="mobile">{@render children()}</Button>
+		<Button {href} {onclick} {disabled} size="mobile">{@render children()}</Button>
 	</div>
 </div>

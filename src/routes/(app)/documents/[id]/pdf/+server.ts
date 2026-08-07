@@ -21,6 +21,7 @@ import { error } from '@sveltejs/kit';
 import { withBusiness } from '$lib/server/core/ctx';
 import { pdfFilename, renderDocumentPdf } from '$lib/server/core/pdf';
 import { printableQuote } from '$lib/server/modules/quoting/public';
+import { printableInvoice } from '$lib/server/modules/invoicing/public';
 import type { PrintableDocument } from '$lib/core/document';
 import type { RequestHandler } from './$types';
 
@@ -33,6 +34,10 @@ export const GET: RequestHandler = async (event) => {
 			{
 				module: 'quoting',
 				resolve: () => printableQuote(ctx.tx, event.params.id, ctx.business.id)
+			},
+			{
+				module: 'invoicing',
+				resolve: () => printableInvoice(ctx.tx, event.params.id, ctx.business.id)
 			}
 		];
 

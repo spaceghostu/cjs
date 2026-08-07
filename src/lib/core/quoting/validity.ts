@@ -1,108 +1,23 @@
 /**
- * CALENDAR DATES, and why they are strings.
+ * HOW LONG A QUOTE LASTS.
  *
- * "Valid until 22 August" is a promise about a day. A `Date` is an instant, and an instant
- * carries a timezone whether you want one or not — so a quote created at 23:30 in Johannesburg
- * and read by a server thinking in UTC is valid until the 21st for one of them and the 22nd for
- * the other. The client has the 22nd printed on their copy. They are right, and the arithmetic
- * has to agree with the paper.
+ * The calendar arithmetic itself moved to `$lib/core/calendar` when Invoicing needed the same
+ * six functions — see the note at the top of that file. What is left here is the part that is
+ * genuinely Quoting's: what a valid-until date MEANS, and the status that follows from it.
  *
- * So a date here is `YYYY-MM-DD` and every operation on it is done in that space. Postgres
- * stores it in a `date` column, which is the same decision made once more.
- *
- * FORMATTING IS DONE BY HAND, for the same reason `format.ts` does not use `Intl`:
- * ICU output varies by platform and Node build, and a document has to render identically on a
- * developer's laptop, in the PDF worker, and in a 2033 reprint. A byte-stable PDF is an
- * acceptance criterion in T17, and a month name that depends on the host's ICU data is not
- * byte-stable.
+ * The re-exports keep `$lib/core/quoting`'s surface exactly as it was, so nothing that imported
+ * `addDays` or `formatShortDate` from this module had to move.
  */
-import type { CalendarDate } from './types';
+import { daysBetween, type CalendarDate } from '$lib/core/calendar';
 
-const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
-
-const MONTHS = [
-	'January',
-	'February',
-	'March',
-	'April',
-	'May',
-	'June',
-	'July',
-	'August',
-	'September',
-	'October',
-	'November',
-	'December'
-] as const;
-
-/** Is this a well-formed calendar date that names a day that exists? */
-export function isCalendarDate(value: unknown): value is CalendarDate {
-	if (typeof value !== 'string') return false;
-	const match = ISO_DATE.exec(value);
-	if (!match) return false;
-
-	// `2026-02-30` matches the pattern and is not a day. Round-tripping through UTC catches it
-	// without ever leaving the calendar: the parts go in, and if the parts do not come back the
-	// date did not exist.
-	const [, y, m, d] = match;
-	const utc = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
-	return (
-		utc.getUTCFullYear() === Number(y) &&
-		utc.getUTCMonth() === Number(m) - 1 &&
-		utc.getUTCDate() === Number(d)
-	);
-}
-
-function parts(date: CalendarDate): { year: number; month: number; day: number } {
-	const match = ISO_DATE.exec(date);
-	if (!match) throw new RangeError(`not a calendar date: ${JSON.stringify(date)}`);
-	return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
-}
-
-function fromUtc(ms: number): CalendarDate {
-	const d = new Date(ms);
-	const year = String(d.getUTCFullYear()).padStart(4, '0');
-	const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-	const day = String(d.getUTCDate()).padStart(2, '0');
-	return `${year}-${month}-${day}`;
-}
-
-/**
- * The calendar day an instant falls on, in a named zone.
- *
- * `timeZone` is a parameter and never defaulted to the host's, because the host is a container
- * that is almost certainly on UTC while the business is in Johannesburg. The business's zone
- * comes from its locale settings; today, everything is `Africa/Johannesburg`.
- *
- * This is the ONE place `Intl` is used, and it is used for a zone offset rather than for
- * presentation — the answer is a number of hours, which does not vary between ICU versions the
- * way a formatted month name does.
- */
-export function todayIn(now: Date, timeZone = 'Africa/Johannesburg'): CalendarDate {
-	const formatter = new Intl.DateTimeFormat('en-CA', {
-		timeZone,
-		year: 'numeric',
-		month: '2-digit',
-		day: '2-digit'
-	});
-	// en-CA is ISO-ordered by definition (`2026-08-04`), which is what makes this a lookup of
-	// the DAY rather than a rendering of it.
-	return formatter.format(now);
-}
-
-/** `2026-08-04` + 14 days -> `2026-08-18`. Month and year roll over correctly. */
-export function addDays(date: CalendarDate, days: number): CalendarDate {
-	const { year, month, day } = parts(date);
-	return fromUtc(Date.UTC(year, month - 1, day + days));
-}
-
-/** Whole days from `from` to `to`, negative when `to` is earlier. */
-export function daysBetween(from: CalendarDate, to: CalendarDate): number {
-	const a = parts(from);
-	const b = parts(to);
-	const ms = Date.UTC(b.year, b.month - 1, b.day) - Date.UTC(a.year, a.month - 1, a.day);
-	return ms / 86_400_000;
-}
+export {
+	addDays,
+	daysBetween,
+	formatDocumentDate,
+	formatShortDate,
+	isCalendarDate,
+	todayIn
+} from '$lib/core/calendar';
 
 /**
  * Has this quote's validity passed?
@@ -137,16 +52,4 @@ export function effectiveStatus<S extends string>(
 ): S | 'expired' {
 	if (status !== 'sent' && status !== 'viewed') return status;
 	return hasExpired(validUntil, today) ? 'expired' : status;
-}
-
-/** "22 August 2026". What prints on the document. */
-export function formatDocumentDate(date: CalendarDate): string {
-	const { year, month, day } = parts(date);
-	return `${day} ${MONTHS[month - 1]} ${year}`;
-}
-
-/** "22 Aug" — the shorter form the interface uses, where the year is obvious from context. */
-export function formatShortDate(date: CalendarDate): string {
-	const { month, day } = parts(date);
-	return `${day} ${MONTHS[month - 1].slice(0, 3)}`;
 }

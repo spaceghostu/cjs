@@ -76,9 +76,12 @@ export const STANDARD_VAT_RATE_PPM = 150_000;
  *
  * "Valid until 22 August" is a promise about a day, not an instant. Carrying it as a `Date`
  * would attach a timezone to it, and the quote would then expire at a different moment for the
- * client reading it than for the business that sent it. See `validity.ts`.
+ * client reading it than for the business that sent it. Defined in `$lib/core/calendar` and
+ * re-exported here, so `$lib/core/quoting` still answers for the whole of a quote's vocabulary.
  */
-export type CalendarDate = string;
+import type { CalendarDate } from '$lib/core/calendar';
+
+export type { CalendarDate };
 
 /** One line, as the editor holds it and the document prints it. */
 export type QuoteLine = {

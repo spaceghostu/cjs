@@ -39,8 +39,18 @@ import {
 	type Quote,
 	type QuoteLine
 } from '$lib/core/quoting';
+import {
+	COST_SOURCES,
+	PAYMENT_KINDS,
+	PAYMENT_METHODS,
+	STORED_INVOICE_STATUSES,
+	type Invoice,
+	type InvoiceLine,
+	type InvoicePayment
+} from '$lib/core/invoicing';
 import type { business, customer, member, MemberRole } from './schema/core';
 import type { quote, quoteLine } from './schema/quoting';
+import type { invoice, invoiceLine, invoicePayment } from './schema/invoicing';
 
 /** What a numeric column can arrive as, depending on how it was queried. */
 export type NumericColumn = string | number | bigint;
@@ -360,6 +370,131 @@ export type QuoteSnapshot = {
 };
 
 export function toQuoteSnapshot(row: QuoteRow): QuoteSnapshot | null {
+	if (
+		row.snapshotSubtotalCents === null ||
+		row.snapshotTaxCents === null ||
+		row.snapshotTotalCents === null ||
+		row.snapshotAt === null
+	) {
+		return null;
+	}
+
+	return {
+		subtotal: toMoney(row.snapshotSubtotalCents, row.currency),
+		tax: toMoney(row.snapshotTaxCents, row.currency),
+		total: toMoney(row.snapshotTotalCents, row.currency),
+		at: row.snapshotAt
+	};
+}
+
+// ── Invoicing ───────────────────────────────────────────────────────────────────────
+//
+// Here for the same reason Quoting's mappers are: this file is the only door money may come
+// through from the database, and an invoice is nothing BUT money. Putting `toInvoiceLine` in
+// `modules/invoicing` would mean either a second import of `money/ctor` — which ESLint
+// refuses — or a module holding raw integers and hoping.
+
+type InvoiceRow = typeof invoice.$inferSelect;
+type InvoiceLineRow = typeof invoiceLine.$inferSelect;
+type InvoicePaymentRow = typeof invoicePayment.$inferSelect;
+
+export function toInvoiceLine(row: InvoiceLineRow): InvoiceLine {
+	return {
+		id: row.id,
+		position: row.position,
+		description: row.description,
+		provenance: row.provenance,
+		documentDescription: row.documentDescription,
+		qty: toQuantity(row.qtyE6),
+		unitPrice: toUnitPrice(row.unitPriceMicros, row.currency),
+		taxTreatment: narrow(row.taxTreatment, TAX_TREATMENTS, 'tax treatment'),
+		vatRate: toRate(row.vatRatePpm),
+		noCharge: row.noCharge,
+		sourceItemId: row.sourceItemId,
+		// Null is a first-class answer here: nobody knows what this line cost. The margin panel
+		// says so rather than treating an unknown cost as zero — see `invoicing/margin.ts`.
+		cost: row.costMicros === null ? null : toUnitPrice(row.costMicros, row.currency),
+		costSource: row.costSource === null ? null : narrow(row.costSource, COST_SOURCES, 'cost source')
+	};
+}
+
+/**
+ * An invoice and its lines.
+ *
+ * Lines arrive as a separate argument rather than being fetched here — nothing in this file
+ * talks to the database, which is what keeps it a pure unit under test. The caller has already
+ * filtered out archived lines and ordered them.
+ *
+ * `status` is the STORED one. `overdue` is derived on read by `effectiveInvoiceStatus`, and a
+ * mapper that produced it would be putting a date-dependent value into a cached object.
+ */
+export function toInvoice(row: InvoiceRow, lines: readonly InvoiceLineRow[]): Invoice {
+	return {
+		id: row.id,
+		status: narrow(row.status, STORED_INVOICE_STATUSES, 'invoice status'),
+		number: row.numberFormatted,
+		customer: {
+			customerId: row.customerId,
+			name: row.customerName,
+			contactPerson: row.customerContactPerson,
+			email: row.customerEmail,
+			phone: row.customerPhone,
+			vatNumber: row.customerVatNumber,
+			addressLine1: row.customerAddressLine1,
+			addressLine2: row.customerAddressLine2,
+			city: row.customerCity,
+			postalCode: row.customerPostalCode,
+			country: row.customerCountry
+		},
+		sendTo: { name: row.sendToName, email: row.sendToEmail },
+		issueDate: row.issueDate,
+		dueDate: row.dueDate,
+		pricing: {
+			mode: narrow(row.pricingMode, PRICING_MODES, 'pricing mode'),
+			engine: narrow(row.taxEngine, TAX_ENGINES, 'tax engine'),
+			vatRate: toRate(row.vatRatePpm),
+			policy: row.vatPolicy
+		},
+		lines: lines.map(toInvoiceLine),
+		sourceQuoteId: row.sourceQuoteId,
+		sourceQuoteNumber: row.sourceQuoteNumber,
+		issuedAt: row.issuedAt,
+		viewCount: row.viewCount,
+		lastViewedAt: row.lastViewedAt,
+		cancelledAt: row.cancelledAt,
+		cancelledReason: row.cancelledReason,
+		savedAt: row.updatedAt
+	};
+}
+
+export function toInvoicePayment(row: InvoicePaymentRow): InvoicePayment {
+	return {
+		id: row.id,
+		kind: narrow(row.kind, PAYMENT_KINDS, 'payment kind'),
+		amount: toMoney(row.amountCents, row.currency),
+		method: narrow(row.method, PAYMENT_METHODS, 'payment method'),
+		reference: row.reference,
+		receivedOn: row.receivedOn,
+		recordedAt: row.recordedAt,
+		recordedByUserId: row.recordedByUserId,
+		reversesPaymentId: row.reversesPaymentId
+	};
+}
+
+/**
+ * The totals an issued invoice froze.
+ *
+ * A triple rather than three loose reads, so a caller cannot pick up two of the three.
+ * `snapshot_complete` makes a partial row unstorable; this makes a partial read unexpressible.
+ */
+export type InvoiceSnapshot = {
+	subtotal: Money;
+	tax: Money;
+	total: Money;
+	at: Date;
+};
+
+export function toInvoiceSnapshot(row: InvoiceRow): InvoiceSnapshot | null {
 	if (
 		row.snapshotSubtotalCents === null ||
 		row.snapshotTaxCents === null ||

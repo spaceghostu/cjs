@@ -226,11 +226,24 @@ export async function cleanupFixtures(): Promise<void> {
 			try {
 				// Even as owner. FORCE ROW LEVEL SECURITY means no context, no rows.
 				await client.query('select set_config($1, $2, true)', ['cjs.business_id', businessId]);
-				// Foreign keys decide the order: lines before their quote, quotes before the
+				// Foreign keys decide the order: lines before their document, documents before the
 				// customer they point at, everything before the business.
+				//
+				// The ledger goes before the documents it refers to — `core_allocation` holds a real
+				// foreign key to `core_posting`, and both carry a `source_id` pointing at an invoice
+				// or a payment. And `invoicing_payment` has a self-reference (a reversal names the
+				// payment it undoes), so reversals come out with the payments in one statement,
+				// which works because the delete is not row-ordered.
 				for (const table of [
 					'audit.row_change',
 					'billing_subscription',
+					'core_allocation',
+					'core_posting',
+					'invoicing_payment',
+					'invoicing_invoice_event',
+					'invoicing_invoice_line',
+					'invoicing_invoice',
+					'invoicing_setting',
 					'quoting_quote_event',
 					'quoting_quote_line',
 					'quoting_quote',

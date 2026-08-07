@@ -51,7 +51,10 @@
 		invoicingOwned,
 		invoicingPrice,
 		newTotal,
-		onaddinvoicing
+		existingInvoice = null,
+		makingInvoice = false,
+		onaddinvoicing,
+		onmakeinvoice
 	}: {
 		document: PrintableDocument;
 		status: QuoteStatus;
@@ -60,11 +63,16 @@
 		events: readonly TimelineEntry[];
 		pdfHref: string;
 		invoicingOwned: boolean;
+		/** The invoice already raised from this quote, if there is one. */
+		existingInvoice?: { id: string; number: string | null } | null;
+		makingInvoice?: boolean;
 		/** Null only if the catalogue ever stops pricing a module. The way out survives it. */
 		invoicingPrice: Money | null;
 		/** What the monthly total becomes WITH Invoicing. Computed, never written down. */
 		newTotal: Money;
 		onaddinvoicing: (key: ModuleKey) => void;
+		/** Raise the invoice. Absent when Invoicing is not owned — the offer is T13's add instead. */
+		onmakeinvoice?: () => void;
 	} = $props();
 
 	const Icon = navIcon('quoting');
@@ -139,13 +147,39 @@
 				<div
 					class="flex flex-col gap-3 rounded-[10px] border border-line-default bg-surface-raised p-5"
 				>
-					<p class="text-ui text-ink">Turn it into an invoice</p>
-					<p class="text-helper text-ink-muted">
-						The lines, the client and the totals come across as they are.
-					</p>
-					<div>
-						<Button variant="secondary" href="/invoicing">Turn it into an invoice</Button>
-					</div>
+					{#if existingInvoice}
+						<!--
+							Already done. Offering it a second time would raise a second invoice for the
+							same work, which is the mistake this branch exists to make impossible — and
+							the thing the person clicking again actually wants is the invoice itself.
+						-->
+						<p class="text-ui text-ink">
+							Invoiced as {existingInvoice.number ?? 'a draft'}
+						</p>
+						<p class="text-helper text-ink-muted">
+							Raised from this quote. The lines and the client came across as they were.
+						</p>
+						<div>
+							<Button variant="secondary" href="/invoicing/{existingInvoice.id}">
+								Open {existingInvoice.number ?? 'the draft'}
+							</Button>
+						</div>
+					{:else}
+						<p class="text-ui text-ink">Turn it into an invoice</p>
+						<p class="text-helper text-ink-muted">
+							The lines, the client and the totals come across as they are.
+						</p>
+						<div>
+							<!--
+								A button, not a link to the list: this WRITES a draft invoice carrying
+								this quote's lines, and the design's own timeline entry — "Created from
+								quote QT-1036" — is only true if something actually creates it.
+							-->
+							<Button variant="secondary" disabled={makingInvoice} onclick={onmakeinvoice}>
+								{makingInvoice ? 'Making it…' : 'Turn it into an invoice'}
+							</Button>
+						</div>
+					{/if}
 				</div>
 			{:else if invoicingPrice}
 				<ContextualAdd

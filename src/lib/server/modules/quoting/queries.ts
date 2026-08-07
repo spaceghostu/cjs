@@ -92,6 +92,21 @@ export async function loadQuote(tx: Tx, quoteId: string): Promise<Quote | null> 
 	return toQuote(header, lines);
 }
 
+/**
+ * The raw lines, for the paths that copy a quote rather than render it.
+ *
+ * Rows rather than the domain type, because turning a quote into an invoice copies COLUMNS —
+ * exact integers, straight across — and going through `Quantity`/`UnitPrice` and back would be a
+ * round trip through two constructors for no gain.
+ */
+export async function loadQuoteLineRows(tx: Tx, quoteId: string) {
+	return tx
+		.select()
+		.from(quoteLine)
+		.where(and(eq(quoteLine.quoteId, quoteId), isNull(quoteLine.archivedAt)))
+		.orderBy(asc(quoteLine.position), asc(quoteLine.createdAt));
+}
+
 /** The raw header, for the paths that need the columns the domain type does not carry. */
 export async function loadQuoteRow(tx: Tx, quoteId: string) {
 	const [row] = await tx.select().from(quote).where(eq(quote.id, quoteId)).limit(1);

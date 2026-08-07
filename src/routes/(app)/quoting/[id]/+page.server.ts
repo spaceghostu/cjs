@@ -29,6 +29,8 @@ import {
 	provisionalNumber
 } from '$lib/server/modules/quoting/queries';
 import { CannotSendQuote, sendQuote } from '$lib/server/modules/quoting/send';
+import { createFromQuote, invoiceForQuote } from '$lib/server/modules/invoicing/public';
+import { loadQuoteLineRows } from '$lib/server/modules/quoting/queries';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
@@ -56,9 +58,15 @@ export const load: PageServerLoad = async (event) => {
 			// accepted a quote is a name they typed rather than an id anything can resolve.
 			const row = await loadQuoteRow(ctx.tx, quote.id);
 
+			// Has this quote already been billed? Asked only when Invoicing is owned — an
+			// unowned module has no invoices, and the offer on this screen is T13's add instead.
+			const existingInvoice =
+				ctx.access.invoicing === 'write' ? await invoiceForQuote(ctx.tx, quote.id) : null;
+
 			return {
 				mode: 'sent' as const,
 				status,
+				existingInvoice,
 				document: quoteDocument({
 					quote,
 					price,
@@ -134,6 +142,90 @@ export const actions: Actions = {
 	 * points at the development server and the one in production points at production, with no
 	 * second setting that can disagree with the request that arrived.
 	 */
+	/**
+	 * "TURN IT INTO AN INVOICE."
+	 *
+	 * The design's own next step after acceptance, and the only thing that makes the invoice
+	 * timeline's "Created from quote QT-1036" reachable in the product.
+	 *
+	 * Crosses the module boundary through `invoicing/public.ts`, which ESLint zone 3 makes the
+	 * only legal path — and this route may do it because a ROUTE is allowed to compose two
+	 * modules a business owns, where a module reaching into another is what breaks graceful
+	 * degradation.
+	 *
+	 * Refused when one already exists. A second invoice for the same accepted quote is a client
+	 * billed twice, which is the mistake worth spending a query to prevent.
+	 */
+	makeInvoice: async (event) => {
+		let id: string;
+
+		try {
+			id = await withModule(event, 'invoicing', 'write', async (ctx) => {
+				const quote = await loadQuote(ctx.tx, event.params.id);
+				// `CannotSendQuote` rather than `error(404)`: a thrown redirect/error inside this
+				// try would be swallowed by the catch below and re-reported as a 500.
+				if (!quote) throw new CannotSendQuote("We couldn't find that quote.");
+
+				if (quote.status !== 'accepted') {
+					throw new CannotSendQuote(
+						'That quote has not been accepted yet, so there is nothing to invoice.'
+					);
+				}
+
+				const already = await invoiceForQuote(ctx.tx, quote.id);
+				if (already) return already.id;
+
+				const row = await loadQuoteRow(ctx.tx, quote.id);
+				const lines = await loadQuoteLineRows(ctx.tx, quote.id);
+
+				return createFromQuote(ctx.tx, ctx.business, {
+					quoteId: quote.id,
+					quoteNumber: quote.number,
+					customerId: quote.customer.customerId,
+					customer: {
+						name: quote.customer.name,
+						contactPerson: quote.customer.contactPerson,
+						email: quote.customer.email,
+						phone: quote.customer.phone,
+						vatNumber: quote.customer.vatNumber,
+						addressLine1: quote.customer.addressLine1,
+						addressLine2: quote.customer.addressLine2,
+						city: quote.customer.city,
+						postalCode: quote.customer.postalCode,
+						country: quote.customer.country
+					},
+					sendToName: quote.sendTo.name,
+					sendToEmail: quote.sendTo.email,
+					// The pricing contract comes across as it was. An invoice raised from a quote
+					// charges what the quote promised, at the rate it promised it.
+					pricingMode: row?.pricingMode ?? 'exclusive',
+					taxEngine: row?.taxEngine ?? 'za_vat',
+					vatRatePpm: row?.vatRatePpm ?? 150_000,
+					vatPolicy: row?.vatPolicy ?? '',
+					currency: row?.currency ?? ctx.business.currency,
+					lines: lines.map((line, i) => ({
+						position: line.position ?? i,
+						description: line.description,
+						provenance: line.provenance,
+						documentDescription: line.documentDescription,
+						qtyE6: line.qtyE6,
+						unitPriceMicros: line.unitPriceMicros,
+						taxTreatment: line.taxTreatment,
+						vatRatePpm: line.vatRatePpm,
+						sourceItemId: line.sourceItemId
+					}))
+				});
+			});
+		} catch (cause) {
+			if (cause instanceof CannotSendQuote) return fail(422, { message: cause.message });
+			return fail(500, {
+				message: 'We could not raise an invoice from that quote. Nothing was created.'
+			});
+		}
+
+		redirect(303, `/invoicing/${id}`);
+	},
+
 	send: async (event) => {
 		try {
 			await withModule(event, 'quoting', 'write', (ctx) =>

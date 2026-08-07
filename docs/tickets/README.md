@@ -118,6 +118,34 @@ Most helper text in the design sits on cards, where it fails. Raised in T01 (tok
 definition) and T27 (the pass). **Recommendation:** lift the helper token to `#96989F` and
 keep `#7D7F88` for non-text decoration only.
 
+### 5. The margin panel's three figures do not reconcile
+
+T21's "The numbers behind it" shows Materials R14 280, Labour R6 720 and **What you keep**
+R6 150, on the invoice whose subtotal is R21 000. But:
+
+```
+14 280 + 6 720 = 21 000     — exactly the whole subtotal
+```
+
+So if those two are **costs**, the business kept nothing and R6 150 is impossible. If they
+are instead a split of the revenue into materials-work and labour-work, then "what you keep"
+is not derivable from them at all and R6 150 would have to come from a cost the panel never
+shows. There is no reading under which all three are true together — the same species of
+error as the mobile `R9 200` in open question 1.
+
+**Decision (implemented):** Materials and Labour are **costs**, and
+
+```
+What you keep = revenue − materials − labour
+```
+
+always, with every figure read from a `core_posting` row rather than computed for display.
+The panel then adds up on every invoice, which is the property that matters — a screen whose
+three numbers do not reconcile teaches an owner not to trust the fourth. Where a line's cost
+is unknown the panel says so and states the figure as an upper bound; where nothing is known
+it shows no figures at all. Raised in T19 and T21; the reasoning lives in
+`src/lib/core/invoicing/margin.ts`.
+
 ## Conventions
 
 - Each ticket is self-contained: an implementer should not need to reopen the design.
