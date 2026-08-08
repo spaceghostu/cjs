@@ -5,7 +5,23 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	let mode = $state<'magic' | 'password' | 'register'>('magic');
+	type Mode = 'magic' | 'password' | 'register';
+
+	/**
+	 * Which of the three forms is showing: whatever the person last picked, otherwise
+	 * whichever action last came back with something to say.
+	 *
+	 * THE FALLBACK IS NOT COSMETIC. These forms post natively — there is no `use:enhance`
+	 * — so a `fail()` is a full page load and this component remounts. A plain
+	 * `$state('magic')` therefore reset to the magic-link tab on every rejected password,
+	 * rendering `form.password` unreachable: the person was bounced back with their email
+	 * prefilled, no error, and no clue what had gone wrong. Deriving it also survives
+	 * `use:enhance` being added later, where `form` changes without a remount.
+	 */
+	let chosen = $state<Mode | null>(null);
+	const mode = $derived<Mode>(
+		chosen ?? (form?.register ? 'register' : form?.password ? 'password' : 'magic')
+	);
 
 	const hasProvider = $derived(data.providers.google || data.providers.microsoft);
 </script>
@@ -124,19 +140,19 @@
 
 		<div class="text-center text-xs text-ink-secondary">
 			{#if mode === 'magic'}
-				<button type="button" class="underline" onclick={() => (mode = 'password')}>
+				<button type="button" class="underline" onclick={() => (chosen = 'password')}>
 					Use a password instead
 				</button>
 			{:else if mode === 'password'}
-				<button type="button" class="underline" onclick={() => (mode = 'magic')}>
+				<button type="button" class="underline" onclick={() => (chosen = 'magic')}>
 					Email me a link instead
 				</button>
 				<span class="mx-1 text-ink-muted">·</span>
-				<button type="button" class="underline" onclick={() => (mode = 'register')}>
+				<button type="button" class="underline" onclick={() => (chosen = 'register')}>
 					Create an account
 				</button>
 			{:else}
-				<button type="button" class="underline" onclick={() => (mode = 'magic')}>
+				<button type="button" class="underline" onclick={() => (chosen = 'magic')}>
 					I already have an account
 				</button>
 			{/if}

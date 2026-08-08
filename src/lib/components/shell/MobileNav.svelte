@@ -88,6 +88,19 @@
 					{row.label}
 				</a>
 			{/each}
+
+			<!--
+				A POST, not a link — see `sign-out/+page.server.ts`. A GET that ends a session can
+				fire from a prefetch or a link scanner, so this is the one row here that is a form.
+			-->
+			<form method="POST" action="/sign-out" class="border-t border-line-row">
+				<button
+					type="submit"
+					class="flex h-11 w-full items-center px-4 text-left text-ui text-ink-secondary"
+				>
+					Sign out
+				</button>
+			</form>
 		</div>
 	{/if}
 

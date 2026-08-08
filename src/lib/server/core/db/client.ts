@@ -18,9 +18,20 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { sql } from 'drizzle-orm';
 import pg from 'pg';
+import net from 'node:net';
 import { env } from '$lib/server/env';
 import * as schema from './schema';
 import type { Tx } from './tx';
+
+/**
+ * `pg` hands every connect() straight to `net.Socket`, which since Node 20 races IPv4 and
+ * IPv6 in parallel ("Happy Eyeballs") and aborts the lot as one `AggregateError [ETIMEDOUT]`
+ * if the race doesn't settle inside its short internal attempt window. Neon's pooler is
+ * dual-stack, and under any load on the event loop (dev-server startup, a busy host) that
+ * window is tight enough to abort connections that would have succeeded. Disabling the race
+ * falls back to a single connect using the OS's resolver order, which is IPv4-first here.
+ */
+net.setDefaultAutoSelectFamily?.(false);
 
 /**
  * Pool sizing. The dashboard streams one short transaction per owned module, so the

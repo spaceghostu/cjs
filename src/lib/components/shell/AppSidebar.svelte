@@ -154,5 +154,18 @@
 				{/if}
 			</a>
 		{/each}
+
+		<!--
+			A POST, not a link — see `sign-out/+page.server.ts`. A GET that ends a session can
+			fire from a prefetch or a link scanner, so this is the one row here that is a form.
+		-->
+		<form method="POST" action="/sign-out">
+			<button
+				type="submit"
+				class="flex h-[34px] w-full items-center gap-2.5 rounded-md px-2.5 text-left text-ui text-ink-secondary transition-colors duration-150 ease-out-forward outline-none hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+			>
+				Sign out
+			</button>
+		</form>
 	</div>
 </nav>
