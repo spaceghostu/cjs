@@ -10,8 +10,9 @@
 		CardDescription,
 		CardHeader,
 		CardTitle,
+		Field,
+		FieldError,
 		Input,
-		Label,
 		Separator
 	} from '$lib/ui';
 	import type { ActionData, PageData } from './$types';
@@ -51,106 +52,125 @@
 		</CardHeader>
 		<CardContent>
 			<form method="POST" action="?/details" class="space-y-5">
-				<div class="space-y-2">
-					<Label for="tradingName">Business name</Label>
-					<Input
-						id="tradingName"
-						name="tradingName"
-						required
-						value={value('tradingName', data.business.tradingName)}
-						aria-invalid={error('tradingName') ? 'true' : undefined}
-					/>
-					{#if error('tradingName')}
-						<p class="text-xs text-wrong">{error('tradingName')}</p>
-					{/if}
+				<Field label="Business name" id="tradingName" error={error('tradingName')}>
+					{#snippet control(field)}
+						<Input
+							{...field}
+							name="tradingName"
+							required
+							value={value('tradingName', data.business.tradingName)}
+						/>
+					{/snippet}
+				</Field>
+
+				<div class="grid gap-3 sm:grid-cols-2">
+					<Field label="Registered name" id="legalName" error={error('legalName')}>
+						{#snippet control(field)}
+							<Input
+								{...field}
+								name="legalName"
+								value={value('legalName', data.business.legalName)}
+							/>
+						{/snippet}
+					</Field>
+					<Field
+						label="Registration number"
+						id="registrationNumber"
+						error={error('registrationNumber')}
+					>
+						{#snippet control(field)}
+							<Input
+								{...field}
+								name="registrationNumber"
+								value={value('registrationNumber', data.business.registrationNumber)}
+							/>
+						{/snippet}
+					</Field>
 				</div>
 
 				<div class="grid gap-3 sm:grid-cols-2">
-					<div class="space-y-2">
-						<Label for="legalName">Registered name</Label>
-						<Input
-							id="legalName"
-							name="legalName"
-							value={value('legalName', data.business.legalName)}
-						/>
-					</div>
-					<div class="space-y-2">
-						<Label for="registrationNumber">Registration number</Label>
-						<Input
-							id="registrationNumber"
-							name="registrationNumber"
-							value={value('registrationNumber', data.business.registrationNumber)}
-						/>
-					</div>
+					<Field
+						label="VAT number"
+						id="vatNumber"
+						error={error('vatNumber')}
+						helper="Leave blank if you are not VAT registered."
+					>
+						{#snippet control(field)}
+							<Input
+								{...field}
+								name="vatNumber"
+								inputmode="numeric"
+								value={value('vatNumber', data.business.vatNumber)}
+							/>
+						{/snippet}
+					</Field>
+					<Field label="Phone" id="phone" error={error('phone')}>
+						{#snippet control(field)}
+							<Input
+								{...field}
+								name="phone"
+								type="tel"
+								value={value('phone', data.business.phone)}
+							/>
+						{/snippet}
+					</Field>
 				</div>
 
-				<div class="grid gap-3 sm:grid-cols-2">
-					<div class="space-y-2">
-						<Label for="vatNumber">VAT number</Label>
+				<Field label="Email" id="email" error={error('email')}>
+					{#snippet control(field)}
 						<Input
-							id="vatNumber"
-							name="vatNumber"
-							inputmode="numeric"
-							value={value('vatNumber', data.business.vatNumber)}
-							aria-invalid={error('vatNumber') ? 'true' : undefined}
+							{...field}
+							name="email"
+							type="email"
+							value={value('email', data.business.email)}
 						/>
-						{#if error('vatNumber')}
-							<p class="text-xs text-wrong">{error('vatNumber')}</p>
-						{:else}
-							<p class="text-xs text-ink-muted">Leave blank if you are not VAT registered.</p>
-						{/if}
-					</div>
-					<div class="space-y-2">
-						<Label for="phone">Phone</Label>
-						<Input id="phone" name="phone" type="tel" value={value('phone', data.business.phone)} />
-					</div>
-				</div>
-
-				<div class="space-y-2">
-					<Label for="email">Email</Label>
-					<Input
-						id="email"
-						name="email"
-						type="email"
-						value={value('email', data.business.email)}
-						aria-invalid={error('email') ? 'true' : undefined}
-					/>
-					{#if error('email')}
-						<p class="text-xs text-wrong">{error('email')}</p>
-					{/if}
-				</div>
+					{/snippet}
+				</Field>
 
 				<Separator />
 
-				<div class="space-y-2">
-					<Label for="addressLine1">Street address</Label>
-					<Input
-						id="addressLine1"
-						name="addressLine1"
-						value={value('addressLine1', data.business.address.line1)}
-					/>
-					<Input
-						id="addressLine2"
-						name="addressLine2"
-						aria-label="Address line 2"
-						value={value('addressLine2', data.business.address.line2)}
-					/>
+				<!--
+					Two fields, one caption. The second line's label is real but off the screen: an
+					address has a second line often enough to deserve a box and rarely enough that
+					captioning it twice would read as two different questions.
+				-->
+				<div class="flex flex-col gap-1.5">
+					<Field label="Street address" id="addressLine1" error={error('addressLine1')}>
+						{#snippet control(field)}
+							<Input
+								{...field}
+								name="addressLine1"
+								value={value('addressLine1', data.business.address.line1)}
+							/>
+						{/snippet}
+					</Field>
+					<Field label="Address line 2" labelHidden id="addressLine2" error={error('addressLine2')}>
+						{#snippet control(field)}
+							<Input
+								{...field}
+								name="addressLine2"
+								value={value('addressLine2', data.business.address.line2)}
+							/>
+						{/snippet}
+					</Field>
 				</div>
 
 				<div class="grid grid-cols-2 gap-3">
-					<div class="space-y-2">
-						<Label for="city">City</Label>
-						<Input id="city" name="city" value={value('city', data.business.address.city)} />
-					</div>
-					<div class="space-y-2">
-						<Label for="postalCode">Postal code</Label>
-						<Input
-							id="postalCode"
-							name="postalCode"
-							inputmode="numeric"
-							value={value('postalCode', data.business.address.postalCode)}
-						/>
-					</div>
+					<Field label="City" id="city" error={error('city')}>
+						{#snippet control(field)}
+							<Input {...field} name="city" value={value('city', data.business.address.city)} />
+						{/snippet}
+					</Field>
+					<Field label="Postal code" id="postalCode" error={error('postalCode')}>
+						{#snippet control(field)}
+							<Input
+								{...field}
+								name="postalCode"
+								inputmode="numeric"
+								value={value('postalCode', data.business.address.postalCode)}
+							/>
+						{/snippet}
+					</Field>
 				</div>
 
 				<Separator />
@@ -169,6 +189,7 @@
 									value={option.value}
 									bind:group={brandColor}
 									class="peer sr-only"
+									aria-describedby={error('brandColor') ? 'brandColor-message' : undefined}
 								/>
 								<span
 									class="size-9 rounded-lg border-2 border-transparent peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-focus-ring"
@@ -179,6 +200,12 @@
 							</label>
 						{/each}
 					</div>
+					<!--
+						A `<legend>` captions this, not a `<label>`, so `Field` is the wrong shape for
+						it — but the sentence underneath is the same sentence in the same colour at the
+						same size, because it is the same paragraph.
+					-->
+					<FieldError id="brandColor-message" error={error('brandColor')} />
 				</fieldset>
 
 				<Button type="submit">Save changes</Button>

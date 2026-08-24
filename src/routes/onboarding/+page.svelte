@@ -8,8 +8,9 @@
 		CardDescription,
 		CardHeader,
 		CardTitle,
-		Input,
-		Label
+		Field,
+		FieldError,
+		Input
 	} from '$lib/ui';
 	import type { ActionData, PageData } from './$types';
 
@@ -37,64 +38,47 @@
 
 		<CardContent>
 			<form method="POST" class="space-y-5">
-				<div class="space-y-2">
-					<Label for="tradingName">Business name</Label>
-					<Input
-						id="tradingName"
-						name="tradingName"
-						required
-						value={value('tradingName')}
-						aria-invalid={error('tradingName') ? 'true' : undefined}
-						aria-describedby={error('tradingName') ? 'tradingName-error' : undefined}
-					/>
-					{#if error('tradingName')}
-						<p id="tradingName-error" class="text-xs text-wrong">{error('tradingName')}</p>
-					{/if}
-				</div>
+				<Field label="Business name" id="tradingName" error={error('tradingName')}>
+					{#snippet control(field)}
+						<Input {...field} name="tradingName" required value={value('tradingName')} />
+					{/snippet}
+				</Field>
 
-				<div class="space-y-2">
-					<Label for="vatNumber">VAT number</Label>
-					<Input
-						id="vatNumber"
-						name="vatNumber"
-						inputmode="numeric"
-						value={value('vatNumber')}
-						aria-invalid={error('vatNumber') ? 'true' : undefined}
-						aria-describedby="vatNumber-help"
-					/>
-					<p id="vatNumber-help" class="text-xs text-ink-muted">
-						Optional. Leave it blank if you are not VAT registered.
-					</p>
-					{#if error('vatNumber')}
-						<p class="text-xs text-wrong">{error('vatNumber')}</p>
-					{/if}
-				</div>
+				<Field
+					label="VAT number"
+					id="vatNumber"
+					error={error('vatNumber')}
+					helper="Optional. Leave it blank if you are not VAT registered."
+				>
+					{#snippet control(field)}
+						<Input {...field} name="vatNumber" inputmode="numeric" value={value('vatNumber')} />
+					{/snippet}
+				</Field>
 
-				<div class="space-y-2">
-					<Label for="addressLine1">Street address</Label>
-					<Input id="addressLine1" name="addressLine1" value={value('addressLine1')} />
-				</div>
+				<Field label="Street address" id="addressLine1" error={error('addressLine1')}>
+					{#snippet control(field)}
+						<Input {...field} name="addressLine1" value={value('addressLine1')} />
+					{/snippet}
+				</Field>
 
 				<div class="grid grid-cols-2 gap-3">
-					<div class="space-y-2">
-						<Label for="city">City</Label>
-						<Input id="city" name="city" value={value('city')} />
-					</div>
-					<div class="space-y-2">
-						<Label for="postalCode">Postal code</Label>
-						<Input
-							id="postalCode"
-							name="postalCode"
-							inputmode="numeric"
-							value={value('postalCode')}
-						/>
-					</div>
+					<Field label="City" id="city" error={error('city')}>
+						{#snippet control(field)}
+							<Input {...field} name="city" value={value('city')} />
+						{/snippet}
+					</Field>
+					<Field label="Postal code" id="postalCode" error={error('postalCode')}>
+						{#snippet control(field)}
+							<Input {...field} name="postalCode" inputmode="numeric" value={value('postalCode')} />
+						{/snippet}
+					</Field>
 				</div>
 
-				<div class="space-y-2">
-					<Label for="phone">Phone</Label>
-					<Input id="phone" name="phone" type="tel" value={value('phone')} />
-				</div>
+				<Field label="Phone" id="phone" error={error('phone')}>
+					{#snippet control(field)}
+						<Input {...field} name="phone" type="tel" value={value('phone')} />
+					{/snippet}
+				</Field>
 
 				<!--
 					Only `--brand` is per-tenant; module accents and the neutral ramp stay fixed, so
@@ -112,6 +96,7 @@
 									value={option.value}
 									bind:group={brandColor}
 									class="peer sr-only"
+									aria-describedby={error('brandColor') ? 'brandColor-message' : undefined}
 								/>
 								<span
 									class="size-9 rounded-lg border-2 border-transparent peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-focus-ring"
@@ -122,9 +107,8 @@
 							</label>
 						{/each}
 					</div>
-					{#if error('brandColor')}
-						<p class="text-xs text-wrong">{error('brandColor')}</p>
-					{/if}
+					<!-- Captioned by a `<legend>`, so it takes the message atom rather than `Field`. -->
+					<FieldError id="brandColor-message" error={error('brandColor')} />
 				</fieldset>
 
 				<Button type="submit" class="w-full">Create my business</Button>

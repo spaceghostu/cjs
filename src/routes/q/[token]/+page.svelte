@@ -16,7 +16,7 @@
 	 */
 	import { enhance } from '$app/forms';
 	import { DocumentSheet } from '$lib/components/document';
-	import { Button, Input, Label, Textarea } from '$lib/ui';
+	import { Button, Field, Input, Textarea } from '$lib/ui';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -89,13 +89,16 @@
 						};
 					}}
 				>
-					<Label for="accept-name">Your name</Label>
-					<div class="mt-1.5 max-w-sm">
-						<Input id="accept-name" name="name" required autocomplete="name" />
-					</div>
-					<p class="mt-1.5 text-helper text-ink-muted">
-						So {data.tradingName} knows who accepted it.
-					</p>
+					<Field
+						label="Your name"
+						id="accept-name"
+						class="max-w-sm"
+						helper="So {data.tradingName} knows who accepted it."
+					>
+						{#snippet control(field)}
+							<Input {...field} name="name" required autocomplete="name" />
+						{/snippet}
+					</Field>
 					<div class="mt-3 flex flex-wrap gap-2">
 						<Button type="submit" disabled={busy}>
 							{busy ? 'Sending…' : 'Accept this quote'}
@@ -117,10 +120,11 @@
 						};
 					}}
 				>
-					<Label for="decline-reason">Anything you'd like to tell them? (optional)</Label>
-					<div class="mt-1.5">
-						<Textarea id="decline-reason" name="reason" rows={3} />
-					</div>
+					<Field label="Anything you'd like to tell them? (optional)" id="decline-reason">
+						{#snippet control(field)}
+							<Textarea {...field} name="reason" rows={3} />
+						{/snippet}
+					</Field>
 					<div class="mt-3 flex flex-wrap gap-2">
 						<Button type="submit" disabled={busy}>{busy ? 'Sending…' : 'Decline'}</Button>
 						<Button variant="secondary" type="button" onclick={() => (answering = null)}>

@@ -12,8 +12,9 @@
 	 * that lagged the total would be the product disagreeing with itself about what the client
 	 * owes.
 	 */
-	import { Amount, Input, Label } from '$lib/ui';
-	import { depositIssue, type EditorState, type QuotePrice } from '$lib/core/quoting';
+	import { Amount, Field, Input } from '$lib/ui';
+	import { checkPercentage } from '$lib/core/validation';
+	import type { EditorState, QuotePrice } from '$lib/core/quoting';
 
 	let {
 		state = $bindable(),
@@ -21,59 +22,67 @@
 		usualDays
 	}: { state: EditorState; price: QuotePrice; usualDays: number } = $props();
 
-	const problem = $derived(depositIssue(state.deposit));
+	/**
+	 * The rate as the money core reads it, handed to the field whole rather than reduced to a
+	 * string here. `kind === 'none'` is what a cleared box means and is not a complaint; the
+	 * `amount` kind is unreachable from this control, which offers a percentage and nothing
+	 * else.
+	 */
+	const check = $derived(
+		state.deposit.kind === 'rate' && state.deposit.rate.trim() !== ''
+			? checkPercentage(state.deposit.rate)
+			: null
+	);
 </script>
 
 <section>
 	<h2 class="text-eyebrow text-ink-muted uppercase">Terms</h2>
 
 	<div class="mt-3 grid gap-4 sm:grid-cols-2">
-		<div>
-			<Label for="quote-valid-until">Valid until</Label>
-			<div class="mt-1.5">
+		<Field label="Valid until" id="quote-valid-until" helper="Your usual {usualDays} days">
+			{#snippet control(field)}
 				<!--
 					A native date input. The design draws a plain field, and the platform's own
 					picker is the one every person on every device already knows how to use — and
 					the one that is accessible without a line of our code.
 				-->
-				<Input id="quote-valid-until" type="date" bind:value={state.validUntil} />
-			</div>
-			<p class="mt-1.5 text-helper text-ink-muted">
-				Your usual {usualDays} days
-			</p>
-		</div>
+				<Input {...field} type="date" bind:value={state.validUntil} />
+			{/snippet}
+		</Field>
 
-		<div>
-			<Label for="quote-deposit">Deposit</Label>
-			<div class="mt-1.5 flex items-center gap-2">
-				<Input
-					id="quote-deposit"
-					numeric
-					class="w-24 text-right"
-					inputmode="decimal"
-					placeholder="50"
-					aria-invalid={problem ? 'true' : undefined}
-					aria-describedby="quote-deposit-help"
-					bind:value={state.deposit.rate}
-					oninput={() => {
-						// Typing a number means "a percentage of the total"; clearing it means the
-						// business is not asking for one. Neither needs a separate control.
-						state.deposit.kind = state.deposit.rate.trim() === '' ? 'none' : 'rate';
-					}}
-				/>
-				<span class="text-ui text-ink-secondary">% to start</span>
-			</div>
+		<Field label="Deposit" id="quote-deposit" result={check}>
+			{#snippet control(field)}
+				<div class="flex items-center gap-2">
+					<Input
+						{...field}
+						numeric
+						class="w-24 text-right"
+						inputmode="decimal"
+						placeholder="50"
+						bind:value={state.deposit.rate}
+						oninput={() => {
+							// Typing a number means "a percentage of the total"; clearing it means the
+							// business is not asking for one. Neither needs a separate control.
+							state.deposit.kind = state.deposit.rate.trim() === '' ? 'none' : 'rate';
+						}}
+					/>
+					<span class="text-ui text-ink-secondary">% to start</span>
+				</div>
+			{/snippet}
 
-			<p id="quote-deposit-help" class="mt-1.5 flex items-center gap-1 text-helper">
-				{#if problem}
-					<span class="text-wrong-ink">{problem}</span>
-				{:else if price.deposit}
+			<!--
+				The helper is a rendered `Amount`, not a string — which is why `Field` takes a
+				snippet for it. A deposit that said "R24 380" as text would be the one number on
+				this screen not spelled the way the product spells money.
+			-->
+			{#snippet helper()}
+				{#if price.deposit}
 					<Amount value={price.deposit} size="sm" tone="muted" decimals={0} />
 					<span class="text-ink-muted">on acceptance</span>
 				{:else}
 					<span class="text-ink-muted">No deposit asked for</span>
 				{/if}
-			</p>
-		</div>
+			{/snippet}
+		</Field>
 	</div>
 </section>

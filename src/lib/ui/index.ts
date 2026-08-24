@@ -76,6 +76,25 @@ export { Toaster } from '$lib/components/ui/sonner';
 /** Money and quantity rendering from T03. Screens never format an amount by hand. */
 export { Amount, Blank, Qty, StatDelta, UnitPrice } from '$lib/components/money';
 
+/**
+ * Fields, and what a field says when it cannot accept what it was given.
+ *
+ * Ours rather than vendored, and deliberately not in `$lib/components/ui/form`: that directory
+ * is globally exempt from linting, so a primitive placed there would escape the money zones and
+ * the validation barrel zone — on a component whose whole job is rendering money and validation
+ * results. Reachability is NOT the reason: this barrel sits outside zone 2 and re-exports from
+ * the vendored directory a dozen times above. `$lib/components/form/index.ts` has it in full.
+ * This is the seam that makes the placement work — screens ask `$lib/ui` for a `Field` and
+ * never learn where it lives.
+ */
+export {
+	Field,
+	FieldError,
+	MoneyField,
+	type FieldControl,
+	type FieldResult
+} from '$lib/components/form';
+
 /** The per-tenant brand hook and palette from T01. */
 export {
 	BRAND_OPTIONS,

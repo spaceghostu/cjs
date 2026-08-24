@@ -33,6 +33,8 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import {
 		Button,
+		Field,
+		FieldError,
 		Input,
 		Label,
 		Select,
@@ -42,6 +44,7 @@
 		Amount
 	} from '$lib/ui';
 	import { DocumentSheet } from '$lib/components/document';
+	import { checkQuantity, checkUnitPrice } from '$lib/core/validation';
 	import {
 		blankLine,
 		blockersToIssuing,
@@ -51,8 +54,6 @@
 		lineAmounts,
 		patchFromEditor,
 		priceInvoice,
-		priceIssue,
-		qtyIssue,
 		type EditorState,
 		type Invoice
 	} from '$lib/core/invoicing';
@@ -170,11 +171,10 @@
 			<h2 class="text-ui font-medium text-ink">Who it's for</h2>
 
 			<div class="mt-3 grid gap-4 sm:grid-cols-2">
-				<div>
-					<Label for="invoice-client">Client</Label>
-					<div class="mt-1.5">
+				<Field label="Client" id="invoice-client">
+					{#snippet control(field)}
 						<Select type="single" value={state.customerId ?? ''} onValueChange={chooseCustomer}>
-							<SelectTrigger id="invoice-client">
+							<SelectTrigger {...field}>
 								{customers.find((c) => c.id === state.customerId)?.name ?? 'Choose a client'}
 							</SelectTrigger>
 							<SelectContent>
@@ -183,23 +183,20 @@
 								{/each}
 							</SelectContent>
 						</Select>
-					</div>
-				</div>
+					{/snippet}
+				</Field>
 
-				<div>
-					<Label for="invoice-email">Send it to</Label>
-					<div class="mt-1.5">
-						<Input id="invoice-email" bind:value={state.sendToEmail} autocomplete="email" />
-					</div>
-				</div>
+				<Field label="Send it to" id="invoice-email">
+					{#snippet control(field)}
+						<Input {...field} bind:value={state.sendToEmail} autocomplete="email" />
+					{/snippet}
+				</Field>
 
-				<div>
-					<Label for="invoice-due">Due date</Label>
-					<div class="mt-1.5">
-						<Input id="invoice-due" type="date" bind:value={state.dueDate} />
-					</div>
-					<p class="mt-1.5 text-helper text-ink-muted">Your usual {usualDays} days.</p>
-				</div>
+				<Field label="Due date" id="invoice-due" helper="Your usual {usualDays} days.">
+					{#snippet control(field)}
+						<Input {...field} type="date" bind:value={state.dueDate} />
+					{/snippet}
+				</Field>
 			</div>
 		</section>
 
@@ -209,8 +206,17 @@
 
 			<div class="mt-3 flex flex-col gap-3">
 				{#each state.lines as line, i (line.id)}
-					{@const qtyProblem = qtyIssue(line.qty)}
-					{@const priceProblem = priceIssue(line.unitPrice)}
+					<!--
+						The money core is asked and its answer is rendered as it stands. A blank box
+						is a line somebody has not priced yet — a normal state of a draft, and
+						`blockersToIssuing` is what stops it going out, not a complaint under the
+						field.
+					-->
+					{@const qty = line.qty.trim() === '' ? null : checkQuantity(line.qty)}
+					{@const price = line.unitPrice.trim() === '' ? null : checkUnitPrice(line.unitPrice)}
+					{@const qtyBad = qty !== null && !qty.ok}
+					{@const priceBad = price !== null && !price.ok}
+					{@const messageId = `line-${line.id}-message`}
 					<div class="rounded-[10px] border border-line-default bg-surface-card p-3">
 						<div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_80px_120px_auto] sm:items-start">
 							<div>
@@ -228,6 +234,8 @@
 									id="line-{line.id}-qty"
 									bind:value={state.lines[i].qty}
 									inputmode="decimal"
+									aria-invalid={qtyBad ? 'true' : undefined}
+									aria-describedby={qtyBad ? messageId : undefined}
 								/>
 							</div>
 
@@ -239,6 +247,8 @@
 									inputmode="decimal"
 									disabled={line.noCharge}
 									placeholder={line.noCharge ? 'Included' : 'Each'}
+									aria-invalid={priceBad ? 'true' : undefined}
+									aria-describedby={priceBad && !qtyBad ? messageId : undefined}
 								/>
 							</div>
 
@@ -272,8 +282,13 @@
 							{/if}
 						</div>
 
-						{#if qtyProblem || priceProblem}
-							<p class="mt-1.5 text-helper text-wrong-ink">{qtyProblem ?? priceProblem}</p>
+						<!--
+							One message for the row, not one per cell. Quantity speaks first when both
+							are unreadable — it is the number typed first, and two complaints about one
+							line reads as the row being broken rather than two characters needing a look.
+						-->
+						{#if qtyBad || priceBad}
+							<FieldError id={messageId} result={qtyBad ? qty : price} class="mt-1.5" />
 						{/if}
 					</div>
 				{/each}

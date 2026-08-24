@@ -224,6 +224,42 @@ describe('paper is theme-invariant', () => {
 	});
 });
 
+/**
+ * The four surfaces a FORM sits on, which is a shorter list than the six a glyph can land on.
+ *
+ * A form is a page, a card, or a dialog. It is never a selected nav row (`--surface-raised`)
+ * and never a draft badge's fill (`--surface-quiet`) — those are marks, not places you type.
+ * That is the whole reason this list can exist: `--state-wrong` measures 4.20:1 on raised and
+ * 4.49:1 on quiet in the dark theme and would fail below, but no field error is ever drawn on
+ * either, and the assertion in `known deviations` already records that fact rather than hiding
+ * it.
+ */
+const FORM_SURFACES = [
+	'--surface-base',
+	'--surface-sunken',
+	'--surface-card',
+	'--surface-overlay'
+] as const;
+
+describe.each(THEMES)('%s theme — the message under a field', (_theme, tokens) => {
+	/**
+	 * The design draws the invalid message in `--state-wrong` at 12px, and 12px is small text,
+	 * so it is held to the text bar rather than the non-text one. `--surface-overlay` is the
+	 * tight one — 4.55:1 in dark, above WCAG AA and below the design's own 4.6 floor — and it
+	 * is the surface every dialog in the product uses, which is why it is measured here rather
+	 * than assumed from the reading-surface pass above.
+	 *
+	 * If this fails, the fix is the token or the surface, not this number. A field error that
+	 * cannot be read is a field error that did not happen.
+	 */
+	it.each(FORM_SURFACES)('--state-wrong is legible as 12px text on %s', (surface) => {
+		expect(
+			contrastRatio(tokens['--state-wrong'], tokens[surface]),
+			`--state-wrong on ${surface}`
+		).toBeGreaterThanOrEqual(WCAG_AA_TEXT);
+	});
+});
+
 describe('known deviations', () => {
 	/**
 	 * Recorded rather than fixed: every value below comes straight from the design, and
