@@ -248,6 +248,15 @@ export async function cleanupFixtures(): Promise<void> {
 					'quoting_quote_line',
 					'quoting_quote',
 					'quoting_setting',
+					// Inventory unwinds innermost-first: a count line names a movement, a movement
+					// names an item and a location, and an item names its default location. The
+					// level view holds nothing of its own, so it needs no line here — which is the
+					// clearest demonstration of why it is a view.
+					'inventory_stock_count_line',
+					'inventory_stock_count',
+					'inventory_movement',
+					'inventory_item',
+					'inventory_location',
 					'core_document_number',
 					'core_customer',
 					'core_member',

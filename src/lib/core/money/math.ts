@@ -121,6 +121,60 @@ export const isZero = (m: Money): boolean => m.cents === 0;
 export const isNegative = (m: Money): boolean => m.cents < 0;
 export const isPositive = (m: Money): boolean => m.cents > 0;
 
+// ── Quantity ────────────────────────────────────────────────────────────────────────────
+//
+// Quantities need the same treatment money gets, and for a narrower but real reason: stock on
+// hand is a SUM OF MOVEMENTS, and `2.5 + 0.1` in floats is not `2.6`. A yard of boards counted
+// in halves, a drum of oil drawn down in tenths of a litre — the same fractions that make
+// `UnitPrice` necessary make float quantities wrong.
+//
+// These live here rather than in a module because `ctor.ts` is import-restricted to this
+// directory (ESLint zone 5), so `$lib/core/inventory` has no other way to construct one. That
+// restriction is the point: exact arithmetic has one home.
+
+export const ZERO_QTY: Quantity = quantity(0);
+
+export function addQty(a: Quantity, b: Quantity): Quantity {
+	return quantity(a.e6 + b.e6);
+}
+
+export function subQty(a: Quantity, b: Quantity): Quantity {
+	return quantity(a.e6 - b.e6);
+}
+
+export function negateQty(a: Quantity): Quantity {
+	return quantity(-a.e6);
+}
+
+/**
+ * The sum of a run of movements.
+ *
+ * BigInt for the same reason `sumMoney` uses it: each term is exact on its own, and only the
+ * running total can leave the range where a double still is. A stock ledger is the longest
+ * addition in the product — one row per movement, for years — so this is the function most
+ * likely to meet that edge.
+ */
+export function sumQty(xs: readonly Quantity[]): Quantity {
+	let total = 0n;
+	for (const x of xs) total += BigInt(x.e6);
+	if (total > BigInt(MAX_CENTS) || total < -BigInt(MAX_CENTS)) {
+		throw new RangeError('sumQty: total is outside the exact integer range');
+	}
+	return quantity(Number(total));
+}
+
+export function cmpQty(a: Quantity, b: Quantity): -1 | 0 | 1 {
+	return a.e6 < b.e6 ? -1 : a.e6 > b.e6 ? 1 : 0;
+}
+
+export function eqQty(a: Quantity, b: Quantity): boolean {
+	return a.e6 === b.e6;
+}
+
+export const isQtyZero = (q: Quantity): boolean => q.e6 === 0;
+export const isQtyNegative = (q: Quantity): boolean => q.e6 < 0;
+export const isQtyPositive = (q: Quantity): boolean => q.e6 > 0;
+
 // ── The three calculations every document does ──────────────────────────────────────────
 
 /**

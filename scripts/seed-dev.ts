@@ -135,7 +135,15 @@ async function ensureBusiness(
 		[userId]
 	);
 
-	if (membership.rows[0]) return { businessId: membership.rows[0].business_id, created: false };
+	if (membership.rows[0]) {
+		const businessId = membership.rows[0].business_id;
+		// Adopt the tenant context on the ALREADY-EXISTS path too, not only when minting.
+		// `tenant_isolation` is FORCEd, which binds the owner role as well, so anything seeded
+		// after this point — stock, and whatever the next module adds — would otherwise be
+		// refused on a second run with a message about a policy rather than about a mistake.
+		await client.query('select set_config($1, $2, true)', ['cjs.business_id', businessId]);
+		return { businessId, created: false };
+	}
 
 	const businessId = randomUUID();
 	await client.query('select set_config($1, $2, true)', ['cjs.business_id', businessId]);
@@ -154,6 +162,102 @@ async function ensureBusiness(
 	return { businessId, created: true };
 }
 
+/**
+ * STOCK, so the Inventory screens have something true to show.
+ *
+ * Written through `tenant_isolation` like everything else — `cjs.business_id` is already set by
+ * `ensureBusiness` on this connection, and it has to be: the policy is FORCEd, which binds the
+ * owner role too, so a seed that reached for a privileged path would be testing a path the
+ * application does not have.
+ *
+ * QUANTITIES ARE MOVEMENTS, HERE AS EVERYWHERE. There is no level to seed. Each item gets one
+ * `opening` movement, and the quantity the screens show is the sum of them.
+ *
+ * The numbers are the design's own, so the screens can be checked against a published figure
+ * rather than against whatever looked plausible: European oak at R1 780 a board, sitting at 18,
+ * which is the "expected 18" a stock count snapshots. Three items are deliberately at or under
+ * their reorder point so the running-low state, the badge, the tab count and the header sentence
+ * are all exercised by default — and one of those is exactly AT its point, which is the boundary
+ * `isBelowReorderPoint` is tested on and the one a careless change would break first.
+ */
+const PLACES = ['Rack A', 'Rack B', 'Bin 4', 'Bin 9', 'Finishing room', 'Yard'] as const;
+
+/** name, unit, cost in rand, reorder point, opening quantity, place. */
+const STOCK: readonly [string, string, number, number, number, string][] = [
+	['European oak, 40mm board', 'board', 1780, 10, 18, 'Rack A'],
+	['Blackened steel bracket, 300mm', 'each', 96, 40, 120, 'Bin 4'],
+	['Danish oil, 5L', 'litre', 420, 12, 8, 'Finishing room'],
+	['Birch ply, 18mm sheet', 'sheet', 400, 6, 9, 'Rack B'],
+	['Brass countersunk screws, 4x40', 'box', 96, 5, 40, 'Bin 9'],
+	['Sash clamp, 900mm', 'each', 650, 4, 4, 'Finishing room'],
+	['Iroko, 25mm board', 'board', 1240, 8, 22, 'Yard'],
+	['Beeswax polish, 1L', 'litre', 180, 6, 2, 'Finishing room'],
+	['Piano hinge, 1800mm', 'each', 310, 3, 11, 'Bin 4'],
+	['Walnut veneer sheet', 'sheet', 540, 5, 14, 'Rack B']
+];
+
+async function seedInventory(client: pg.Client, businessId: string): Promise<boolean> {
+	const already = await client.query('select 1 from inventory_item limit 1');
+	if (already.rows.length > 0) return false;
+
+	const places = new Map<string, string>();
+	for (const name of PLACES) {
+		const id = randomUUID();
+		places.set(name, id);
+		await client.query(
+			'insert into inventory_location (id, business_id, name) values ($1, $2, $3)',
+			[id, businessId, name]
+		);
+	}
+
+	for (const [name, unit, costRand, reorder, opening, place] of STOCK) {
+		const itemId = randomUUID();
+		const locationId = places.get(place)!;
+
+		await client.query(
+			`insert into inventory_item
+			   (id, business_id, name, unit, cost_micros, sell_micros,
+			    reorder_point_e6, default_location_id)
+			 values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+			[
+				itemId,
+				businessId,
+				name,
+				unit,
+				// Rand -> millionths of a rand. Integers throughout; nothing here is a float.
+				costRand * 1_000_000,
+				Math.trunc(costRand * 1.6) * 1_000_000,
+				reorder * 1_000_000,
+				locationId
+			]
+		);
+
+		await client.query(
+			`insert into inventory_movement
+			   (business_id, item_id, location_id, qty_e6, reason, unit_cost_micros, occurred_on)
+			 values ($1, $2, $3, $4, 'opening', $5, current_date - 30)`,
+			[businessId, itemId, locationId, opening * 1_000_000, costRand * 1_000_000]
+		);
+	}
+
+	// One item with no cost recorded, so the valuation's "n items have no cost" line is real
+	// rather than theoretical, and `Blank` gets exercised on the detail screen.
+	const uncostedId = randomUUID();
+	await client.query(
+		`insert into inventory_item (id, business_id, name, unit, reorder_point_e6, default_location_id)
+		 values ($1, $2, 'Offcuts, assorted', 'box', 0, $3)`,
+		[uncostedId, businessId, places.get('Yard')!]
+	);
+	await client.query(
+		`insert into inventory_movement
+		   (business_id, item_id, location_id, qty_e6, reason, occurred_on)
+		 values ($1, $2, $3, $4, 'opening', current_date - 30)`,
+		[businessId, uncostedId, places.get('Yard')!, 6 * 1_000_000]
+	);
+
+	return true;
+}
+
 /** Exported so an integration test can assert the seeded account actually signs in. */
 export async function seed(connectionString: string): Promise<SeedResult> {
 	assertLocal(connectionString);
@@ -167,6 +271,7 @@ export async function seed(connectionString: string): Promise<SeedResult> {
 		await client.query('begin');
 		const { userId, created: userCreated } = await upsertUser(client);
 		const { businessId, created: businessCreated } = await ensureBusiness(client, userId);
+		const stockCreated = await seedInventory(client, businessId);
 		await client.query('commit');
 
 		return {
@@ -174,7 +279,7 @@ export async function seed(connectionString: string): Promise<SeedResult> {
 			password: PASSWORD,
 			userId,
 			businessId,
-			created: userCreated || businessCreated
+			created: userCreated || businessCreated || stockCreated
 		};
 	} catch (error) {
 		await client.query('rollback').catch(() => {});

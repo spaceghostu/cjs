@@ -123,6 +123,19 @@ export function toQuantityOrNull(e6: NumericColumn | null): Quantity | null {
 	return e6 === null ? null : toQuantity(e6);
 }
 
+/**
+ * An unrecorded price, which is emphatically not a free one.
+ *
+ * `inventory_item.cost_micros` is the case this was added for: "nobody has told us what this
+ * costs" is a real state, and rendering it as `R0` would be a lie the valuation then adds up.
+ */
+export function toUnitPriceOrNull(
+	micros: NumericColumn | null,
+	currency: unknown = ZAR
+): UnitPrice | null {
+	return micros === null ? null : toUnitPrice(micros, currency);
+}
+
 // ── Domain -> column ────────────────────────────────────────────────────────────────
 //
 // The way back out. Deliberately trivial: the whole point of the object types is that the

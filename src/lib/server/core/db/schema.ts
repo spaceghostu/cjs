@@ -20,3 +20,4 @@ export * from './schema/ledger';
 export * from './schema/audit';
 export * from './schema/quoting';
 export * from './schema/invoicing';
+export * from './schema/inventory';
