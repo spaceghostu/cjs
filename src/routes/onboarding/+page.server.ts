@@ -13,6 +13,7 @@
 import { fail, redirect, type Actions } from '@sveltejs/kit';
 import { sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { check, messagesByField, type Vocabulary } from '$lib/core/validation';
 import { withNewBusiness } from '$lib/server/core/ctx';
 import { BRAND_OPTIONS, DEFAULT_BRAND, isBrandColor } from '$lib/components/theme';
 import type { PageServerLoad } from './$types';
@@ -39,6 +40,19 @@ const schema = z.object({
 	brandColor: z.string().refine(isBrandColor, 'Pick one of the offered colours')
 });
 
+/** What to call each field when the standard has to write the sentence itself. */
+const WORDS: Vocabulary = {
+	fields: {
+		tradingName: 'A business name',
+		vatNumber: 'A VAT number',
+		addressLine1: 'An address',
+		city: 'A city',
+		postalCode: 'A postal code',
+		phone: 'A phone number',
+		brandColor: 'A brand colour'
+	}
+};
+
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) redirect(303, '/sign-in?next=%2Fonboarding');
 
@@ -58,17 +72,16 @@ export const actions: Actions = {
 		if (!locals.user) redirect(303, '/sign-in?next=%2Fonboarding');
 
 		const values = Object.fromEntries(await request.formData()) as Record<string, string>;
-		const parsed = schema.safeParse(values);
+		const parsed = check(schema, values, WORDS);
 
-		if (!parsed.success) {
-			const errors: Record<string, string> = {};
-			for (const issue of parsed.error.issues) {
-				errors[String(issue.path[0])] ??= issue.message;
-			}
-			return fail(400, { values, errors });
+		if (!parsed.ok) {
+			// What they typed goes back with the errors. Somebody creating their business has
+			// entered a name, a VAT number and an address; losing that to a typo in one field
+			// would be the first thing this product ever did to them.
+			return fail(400, { values, errors: messagesByField(parsed) });
 		}
 
-		const input = parsed.data;
+		const input = parsed.value;
 		const userId = locals.user.id;
 
 		const businessId = await withNewBusiness(userId, async ({ tx, businessId }) => {

@@ -9,6 +9,7 @@
 import { fail, redirect, type Actions } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
+import { check, messagesByField, type Vocabulary } from '$lib/core/validation';
 import { withBusiness } from '$lib/server/core/ctx';
 import { business as businessTable, member as memberTable } from '$lib/server/core/db/schema/core';
 import { user as userTable } from '$lib/server/core/db/schema/identity';
@@ -36,6 +37,29 @@ const details = z.object({
 	postalCode: z.string().trim().optional(),
 	brandColor: z.string().refine(isBrandColor, 'Pick one of the offered colours')
 });
+
+/**
+ * What to call each field when the standard has to write the sentence itself.
+ *
+ * Most of these rules already carry copy somebody wrote, and `check()` keeps it. This is for
+ * the ones that do not — a field left blank, a value that arrived as the wrong shape — so that
+ * the message says "An email address is needed" rather than naming the column.
+ */
+const WORDS: Vocabulary = {
+	fields: {
+		tradingName: 'A business name',
+		legalName: 'The registered name',
+		registrationNumber: 'The registration number',
+		vatNumber: 'A VAT number',
+		phone: 'A phone number',
+		email: 'An email address',
+		addressLine1: 'An address',
+		addressLine2: 'An address',
+		city: 'A city',
+		postalCode: 'A postal code',
+		brandColor: 'A brand colour'
+	}
+};
 
 export const load: PageServerLoad = async (event) => {
 	return withBusiness(event, async (ctx) => {
@@ -67,15 +91,16 @@ export const load: PageServerLoad = async (event) => {
 export const actions: Actions = {
 	details: async (event) => {
 		const values = Object.fromEntries(await event.request.formData()) as Record<string, string>;
-		const parsed = details.safeParse(values);
+		const parsed = check(details, values, WORDS);
 
-		if (!parsed.success) {
-			const errors: Record<string, string> = {};
-			for (const issue of parsed.error.issues) errors[String(issue.path[0])] ??= issue.message;
-			return fail(400, { values, errors });
+		if (!parsed.ok) {
+			// `values` goes back with the errors, which is the whole of "invalid input is
+			// preserved": the form re-renders with what the person typed still in it, one message
+			// per field, and nothing written to the database.
+			return fail(400, { values, errors: messagesByField(parsed) });
 		}
 
-		const input = parsed.data;
+		const input = parsed.value;
 
 		await withBusiness(event, async (ctx) => {
 			// No `where business_id = …`. The policy scopes the UPDATE to this tenant's single

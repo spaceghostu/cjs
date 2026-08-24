@@ -18,15 +18,13 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { issuerFrom } from '$lib/core/quoting';
 import { todayIn } from '$lib/core/calendar';
-import { parseMoneyInput } from '$lib/core/money';
+import { checkAmount } from '$lib/core/validation';
 import {
 	canReverse,
 	effectiveInvoiceStatus,
 	invoiceDocument,
 	priceInvoice,
-	settle,
-	PAYMENT_METHODS,
-	type PaymentMethod
+	settle
 } from '$lib/core/invoicing';
 import { withModule } from '$lib/server/core/ctx';
 import { business as businessTable, member as memberTable } from '$lib/server/core/db/schema/core';
@@ -50,6 +48,7 @@ import {
 	provisionalNumber
 } from '$lib/server/modules/invoicing/queries';
 import { CannotIssueInvoice, issueInvoice, sendReminder } from '$lib/server/modules/invoicing/send';
+import { parsePayment } from '$lib/server/modules/invoicing/wire';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
@@ -225,28 +224,32 @@ export const actions: Actions = {
 	recordPayment: async (event) => {
 		const form = await event.request.formData();
 
-		// Through `parseMoneyInput`, the sanctioned door for human-typed money. A field that said
-		// "24 150,00" and a field that said "24150" mean the same thing to a person, and this is
-		// the one place in the product that knows that.
-		const parsed = parseMoneyInput(String(form.get('amount') ?? ''));
-		if (!parsed.ok) return fail(422, { message: `That amount ${parsed.message}.` });
+		// TWO CHECKS, AND BOTH ARE NECESSARY.
+		//
+		// `checkAmount` is the sanctioned door for human-typed money — a field that said
+		// "24 150,00" and a field that said "24150" mean the same thing to a person, and the
+		// money core is the one thing in the product that knows that. It also carries the
+		// standard's sentence, so a refusal here reads as a sentence rather than as this file's
+		// old `That amount ${message}.`, which produced "That amount Enter an amount..".
+		//
+		// `parsePayment` is the zod boundary, and it runs on the assembled payload rather than
+		// on the amount alone. Before this it did not run at all here: `receivedOn` reached the
+		// ledger unchecked, and the method was tested against the list by hand. A payment is the
+		// one thing on this screen that moves money, so it gets the schema like everything else.
+		const amount = checkAmount(String(form.get('amount') ?? ''), 'amount');
+		if (!amount.ok) return fail(422, { message: amount.message });
 
-		const receivedOn = String(form.get('receivedOn') ?? '');
-		const method = String(form.get('method') ?? 'eft');
-		const reference = String(form.get('reference') ?? '').trim() || null;
-
-		if (!(PAYMENT_METHODS as readonly string[]).includes(method)) {
-			return fail(422, { message: "We don't recognise that payment method." });
-		}
+		const payment = parsePayment({
+			amountCents: amount.value.cents,
+			receivedOn: String(form.get('receivedOn') ?? ''),
+			method: String(form.get('method') ?? 'eft'),
+			reference: String(form.get('reference') ?? '')
+		});
+		if (!payment.ok) return fail(422, { message: payment.message });
 
 		try {
 			await withModule(event, 'invoicing', 'write', (ctx) =>
-				recordPayment(ctx.tx, ctx.business.id, ctx.userId, event.params.id, {
-					amountCents: parsed.value.cents,
-					receivedOn,
-					method: method as PaymentMethod,
-					reference
-				})
+				recordPayment(ctx.tx, ctx.business.id, ctx.userId, event.params.id, payment.value)
 			);
 			return { recorded: true };
 		} catch (cause) {
