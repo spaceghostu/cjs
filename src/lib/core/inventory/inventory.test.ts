@@ -321,4 +321,20 @@ describe('the words the screens say', () => {
 		expect(emptyCopy('all')).not.toBe(emptyCopy('low'));
 		expect(emptyCopy('low')).toBe('Nothing running low. That is usually good news.');
 	});
+
+	/**
+	 * The third state, and the one that is easy to miss: a business that has archived everything
+	 * has an empty `All` tab and is NOT a first-run. Telling somebody with eleven archived items
+	 * to "add your first item" is the interface failing to notice what they already have.
+	 */
+	it('does not call an all-archived business a first-run', () => {
+		const firstRun = emptyCopy('all', false);
+		const allArchived = emptyCopy('all', true);
+
+		expect(firstRun).not.toBe(allArchived);
+		expect(firstRun).toMatch(/first item/i);
+		expect(allArchived).not.toMatch(/first item/i);
+		// It points at the tab that holds the answer, rather than leaving them to find it.
+		expect(allArchived).toMatch(/archived/i);
+	});
 });

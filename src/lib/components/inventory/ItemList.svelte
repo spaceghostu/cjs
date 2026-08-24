@@ -138,7 +138,7 @@
 		</div>
 	{:else if items.length === 0}
 		<!-- A FILTER THAT MATCHED NOTHING. One line, no panel, no button. -->
-		<p class="mt-8 text-ui text-ink-secondary">{emptyCopy(filter)}</p>
+		<p class="mt-8 text-ui text-ink-secondary">{emptyCopy(filter, counts.archived > 0)}</p>
 	{:else}
 		<div class="hidden lg:block">
 			<ItemTable {items} {sort} {direction} {sortHref} />
