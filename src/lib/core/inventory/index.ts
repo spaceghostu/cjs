@@ -53,13 +53,16 @@ export {
 export type { InventoryFilter, InventorySort, SortDirection } from './filter';
 
 export {
+	countProgressLine,
+	countTitle,
 	emptyCopy,
+	homeStandingCopy,
 	movementReasonCopy,
 	standingSentence,
 	stockCopy,
 	summarySentence
 } from './copy';
 
-export type { StockCopy, SummaryFacts, Tone } from './copy';
+export type { StandingCopy, StockCopy, SummaryFacts, Tone } from './copy';
 
 export type { ItemPatch, MovementPatch } from './wire';

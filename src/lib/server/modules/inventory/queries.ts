@@ -15,7 +15,7 @@
  * unchanged here — "an unbounded query is a defect waiting for a successful customer" — and a
  * business with three thousand parts is a better outcome than one with thirty.
  */
-import { and, asc, count, desc, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import type { Tx } from '$lib/server/core/ctx';
 import {
 	inventoryLevel,
@@ -207,13 +207,57 @@ export async function countItems(tx: Tx): Promise<InventoryCounts> {
 	const [row] = await tx
 		.select({
 			all: sql<number>`count(*) filter (where ${item.archivedAt} is null)::int`,
-			low: sql<number>`count(*) filter (where ${item.archivedAt} is null and coalesce(${levels.qtyE6}, 0) < ${item.reorderPointE6})::int`,
+			low: sql<number>`count(*) filter (where ${item.archivedAt} is null and ${lowPredicate(levels)})::int`,
 			archived: sql<number>`count(*) filter (where ${item.archivedAt} is not null)::int`
 		})
 		.from(item)
 		.leftJoin(levels, eq(levels.itemId, item.id));
 
 	return { all: row.all, low: row.low, archived: row.archived };
+}
+
+/**
+ * WHAT HOME SAYS ABOUT STOCK — the counts, and enough names to say which.
+ *
+ * `homeStandingCopy` needs three things: how many items there are, how many are under their reorder
+ * point, and the names of the first couple — because SPA-8 is specific that the concern names what
+ * is low rather than saying "check your stock".
+ *
+ * ONE STATEMENT, NOT TWO. The count and the names have to agree, and `lowNamesSentence` derives its
+ * "and 2 others" by subtracting the names it shows from the count it was given. Two statements in
+ * one READ COMMITTED transaction get two snapshots, so a movement landing between them would
+ * produce "European oak and one other" for four low items. One aggregate cannot disagree with
+ * itself.
+ *
+ * The slice is `[1:2]` because `lowNamesSentence` shows at most two — see the note there about a
+ * 12px line that stops being a glance once it wraps. `array_agg ... filter` returns NULL rather
+ * than an empty array when nothing matches, hence the `coalesce`.
+ */
+export type StockStanding = {
+	readonly itemCount: number;
+	readonly lowCount: number;
+	/** At most two, alphabetical. The rest of the answer is `lowCount`. */
+	readonly lowNames: readonly string[];
+};
+
+export async function stockStanding(tx: Tx): Promise<StockStanding> {
+	const levels = levelsByItem(tx);
+	const low = sql`${item.archivedAt} is null and ${lowPredicate(levels)}`;
+
+	const [row] = await tx
+		.select({
+			itemCount: sql<number>`count(*) filter (where ${item.archivedAt} is null)::int`,
+			lowCount: sql<number>`count(*) filter (where ${low})::int`,
+			// Alphabetical rather than furthest-below, so the two names a returning owner reads are
+			// the two they read yesterday. This panel's argument is that the eye lands where it did.
+			lowNames: sql<
+				string[]
+			>`coalesce((array_agg(${item.name} order by ${item.name}) filter (where ${low}))[1:2], '{}'::text[])`
+		})
+		.from(item)
+		.leftJoin(levels, eq(levels.itemId, item.id));
+
+	return { itemCount: row.itemCount, lowCount: row.lowCount, lowNames: row.lowNames };
 }
 
 /**
@@ -503,6 +547,62 @@ export async function loadStockCount(tx: Tx, countId: string): Promise<StockCoun
 
 	if (!row) return null;
 	return { ...row, status: row.status as StockCountStatus };
+}
+
+/**
+ * THE COUNT SOMEBODY LEFT PART-FINISHED, and how far in they were.
+ *
+ * `counting` and `reviewing` only. `applied` is finished and frozen. `preparing` is not a resting
+ * state at all — `prepareCount` inserts at `preparing` and flips to `counting` in the same
+ * transaction, so a row still sitting there is the wreckage of a rolled-back attempt rather than
+ * anybody's half-done work.
+ *
+ * ORDERED ON `startedAt`, NOT `updatedAt`. Counting an item updates the LINE, and the touch
+ * trigger for the header only fires when the header itself changes — so a count worked on all
+ * afternoon has the `updatedAt` it was created with. `updatedAt` would order these by when their
+ * status last moved, which is very nearly the opposite of what the card claims. `id` breaks the
+ * tie, per the note in `orderFor`.
+ *
+ * `counted` is lines with a quantity somebody recorded, which is what `countProgress` means by it
+ * — the NULL is load-bearing, because "not counted yet" and "counted zero" are different facts.
+ */
+export type UnfinishedCountRow = {
+	readonly id: string;
+	readonly periodStart: CalendarDate;
+	readonly periodEnd: CalendarDate;
+	readonly counted: number;
+	readonly total: number;
+};
+
+export async function unfinishedCount(tx: Tx): Promise<UnfinishedCountRow | null> {
+	const [header] = await tx
+		.select({
+			id: stockCount.id,
+			periodStart: stockCount.periodStart,
+			periodEnd: stockCount.periodEnd
+		})
+		.from(stockCount)
+		.where(
+			and(
+				isNull(stockCount.archivedAt),
+				inArray(stockCount.status, ['counting', 'reviewing'] satisfies StockCountStatus[])
+			)
+		)
+		.orderBy(desc(stockCount.startedAt), desc(stockCount.id))
+		.limit(1);
+
+	if (!header) return null;
+
+	// One aggregate, and only for the count that will actually be shown.
+	const [progress] = await tx
+		.select({
+			total: sql<number>`count(*)::int`,
+			counted: sql<number>`count(${stockCountLine.countedQtyE6})::int`
+		})
+		.from(stockCountLine)
+		.where(eq(stockCountLine.stockCountId, header.id));
+
+	return { ...header, counted: progress.counted, total: progress.total };
 }
 
 export type StockCountLineRow = {

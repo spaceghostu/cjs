@@ -22,7 +22,10 @@ import {
 } from './stock';
 import { matchesFilter } from './filter';
 import {
+	countProgressLine,
+	countTitle,
 	emptyCopy,
+	homeStandingCopy,
 	movementReasonCopy,
 	standingSentence,
 	stockCopy,
@@ -320,5 +323,107 @@ describe('the words the screens say', () => {
 	it('distinguishes an empty module from a filter matching nothing', () => {
 		expect(emptyCopy('all')).not.toBe(emptyCopy('low'));
 		expect(emptyCopy('low')).toBe('Nothing running low. That is usually good news.');
+	});
+});
+
+/**
+ * WHAT HOME IS TOLD ABOUT STOCK.
+ *
+ * One sentence with two answers, and the shapes below are every way it comes out. The concern is
+ * the interesting half: SPA-8 is explicit that it names what is low rather than saying "check
+ * your stock", so what is asserted here is that the names actually arrive in the sentence, and
+ * that the count and the names agree about how many were left out.
+ *
+ * THE NAMES COME BACK ALPHABETICAL. `stockStanding` orders them by name, so the ticket's
+ * illustrative "European oak, Danish oil and one other" reads as "Danish oil, European oak and
+ * one other" against real rows. Asserted deliberately, so nobody pastes the ticket's order in and
+ * gets a red test for the wrong reason.
+ */
+describe('what Home is told about stock', () => {
+	it('reassures with the count, and says the zero rather than hiding it', () => {
+		expect(homeStandingCopy(48, [], 0)).toEqual({
+			statement: '48 items counted',
+			explanation: 'None running low.'
+		});
+	});
+
+	it('does not say "1 items"', () => {
+		expect(homeStandingCopy(1, [], 0).statement).toBe('1 item counted');
+	});
+
+	/** The concern, in the same register as the reassurance — a fact, with the thing named. */
+	it('names the one item that is running low', () => {
+		expect(homeStandingCopy(48, ['European oak'], 1)).toEqual({
+			statement: '1 item is running low',
+			explanation: 'European oak. Out of 48 items you count.'
+		});
+	});
+
+	it('agrees with itself about the verb when there are several', () => {
+		expect(homeStandingCopy(48, ['Danish oil', 'European oak'], 2)).toEqual({
+			statement: '2 items are running low',
+			explanation: 'Danish oil · European oak. Out of 48 items you count.'
+		});
+	});
+
+	/** Two names, then a count. A list that wraps at 12px stops being a glance. */
+	it('names two and counts the rest', () => {
+		expect(homeStandingCopy(48, ['Danish oil', 'European oak'], 3).explanation).toBe(
+			'Danish oil · European oak · and one other. Out of 48 items you count.'
+		);
+
+		expect(homeStandingCopy(48, ['Danish oil', 'European oak'], 5).explanation).toBe(
+			'Danish oil · European oak · and 3 others. Out of 48 items you count.'
+		);
+	});
+
+	/** Every item counted and every one of them low is a real state, and not a special sentence. */
+	it('holds up when everything is running low', () => {
+		expect(homeStandingCopy(2, ['Danish oil', 'European oak'], 2).explanation).toBe(
+			'Danish oil · European oak. Out of 2 items you count.'
+		);
+	});
+
+	/**
+	 * THE REASON THE SEPARATOR IS NOT A COMMA. Half the names in a joinery's stock have one in
+	 * them, and comma-joined these two read as four things.
+	 */
+	it('stays legible when the item names themselves contain commas', () => {
+		expect(homeStandingCopy(6, ['European oak, 40mm board', 'Danish oil, 5L'], 3).explanation).toBe(
+			'European oak, 40mm board · Danish oil, 5L · and one other. Out of 6 items you count.'
+		);
+	});
+
+	it('states the progress on a count somebody left part-finished', () => {
+		expect(countProgressLine(18, 48)).toBe('18 of 48 counted');
+		expect(countProgressLine(0, 48)).toBe('0 of 48 counted');
+		expect(countProgressLine(1, 1)).toBe('1 of 1 counted');
+	});
+
+	/** A count is a period, not a day — so it is named by its month, in the business's locale. */
+	it('names a count by its month', () => {
+		expect(countTitle('2026-07-01', '2026-07-31', 'en-ZA')).toBe('Stock count · July');
+	});
+
+	it('names both months when a period straddles two', () => {
+		expect(countTitle('2026-06-15', '2026-07-14', 'en-ZA')).toBe('Stock count · June to July');
+	});
+
+	/**
+	 * December to January crosses a year as well as a month, and is the case where a naive
+	 * `getMonth()` and a timezone-sensitive parse both go wrong in different directions.
+	 */
+	it('crosses a year without losing the months', () => {
+		expect(countTitle('2026-12-01', '2027-01-31', 'en-ZA')).toBe(
+			'Stock count · December to January'
+		);
+	});
+
+	/**
+	 * The first of the month is where a timezone shift would show: read in a zone behind UTC, a
+	 * period starting 1 July becomes 30 June and the count is titled with the wrong month.
+	 */
+	it('does not slip a month on the first of one', () => {
+		expect(countTitle('2026-07-01', '2026-07-01', 'en-ZA')).toBe('Stock count · July');
 	});
 });

@@ -9,20 +9,26 @@
  * Requires a database: `bun run db:dev`.
  */
 import { describe, it, expect, afterAll } from 'vitest';
-import { eq, sql } from 'drizzle-orm';
+import { asc, eq, sql } from 'drizzle-orm';
 import { formatZar } from '$lib/core/money';
 import { isBelowReorderPoint } from '$lib/core/inventory';
 import { closePool, runScoped } from '$lib/server/core/db/client';
-import { stockCountLine } from '$lib/server/core/db/schema/inventory';
+import { stockCount, stockCountLine } from '$lib/server/core/db/schema/inventory';
 import {
 	cleanupFixtures,
 	createBusiness,
 	createUser,
+	eventFor,
+	localsFor,
 	messageFromRejection
 } from '$lib/server/core/db/fixtures';
-import { createItem, recordMovement, CannotDoThat } from './effects';
+import { withBusiness, type Ctx } from '$lib/server/core/ctx';
+import { loadAccess } from '$lib/server/core/entitlement';
+import { addModule } from '$lib/server/core/modules/subscribe';
+import { archiveItem, createItem, recordMovement, CannotDoThat } from './effects';
 import { applyCount, prepareCount, reviewCount, saveCountLine } from './counts';
 import { countItems, listItems, listMovements, loadItem, summarise } from './queries';
+import { summariseInventory } from './summary';
 
 /** Millionths of a unit. */
 const units = (n: number) => n * 1_000_000;
@@ -484,6 +490,314 @@ describe('applying a count', () => {
 
 			const count = await reviewCount(tx, countId);
 			expect(count.changes).toBe(1);
+		});
+	});
+});
+
+/**
+ * WHAT HOME IS TOLD, against real rows.
+ *
+ * The sentences themselves are proven in `core/inventory/inventory.test.ts`, where they cost
+ * nothing to enumerate. What needs Postgres is everything around them: that the count Home
+ * states and the count the `Running low` tab states come from one predicate, that an archived
+ * item leaves both numbers, that the names arrive alphabetically and agree with the count they
+ * are subtracted from, and that a stock count somebody walked away from is found by its status
+ * rather than by when its header last happened to move.
+ */
+describe('what Home is told about stock', () => {
+	async function homeTenant() {
+		const owner = await createUser('Alice Thornhill');
+		const business = await createBusiness(owner.id, 'Thornhill Joinery');
+		return { owner, business, businessId: business.id, userId: owner.id };
+	}
+
+	type HomeSeeded = Awaited<ReturnType<typeof homeTenant>>;
+
+	/** A `Ctx` whose access map is read from the database, so each step sees the last one's work. */
+	async function act<T>(t: HomeSeeded, fn: (ctx: Ctx) => Promise<T>): Promise<T> {
+		const locals = await localsFor(t.owner, t.business);
+		const access = await runScoped(t.businessId, t.userId, (tx) => loadAccess(tx));
+		return withBusiness(eventFor({ ...locals, access }), fn);
+	}
+
+	/** Exactly what `home/load.ts` does: one scoped transaction, one clock reading. */
+	function homeSays(t: HomeSeeded, now = new Date()) {
+		return act(t, (ctx) =>
+			summariseInventory({ tx: ctx.tx, business: ctx.business, access: ctx.access, now })
+		);
+	}
+
+	/**
+	 * `createBusiness` subscribes to nothing, and `readiness` needs an open period — so the empty
+	 * state has to be bought the way a real business buys it.
+	 */
+	async function ownInventory(t: HomeSeeded) {
+		await act(t, (ctx) => addModule(ctx, 'inventory', new Date('2026-07-14T09:00:00+02:00')));
+	}
+
+	describe('the standing point', () => {
+		it('reassures rather than saying "0 items counted" when nothing is in it yet', async () => {
+			const t = await homeTenant();
+			await ownInventory(t);
+
+			const { standing } = await homeSays(t);
+
+			expect(standing?.statement).toBe('Inventory is ready when you are');
+			expect(standing?.explanation).toMatch(/Nothing counted yet\.$/);
+			// Not having used something yet is not a problem, and there is nowhere to go about it.
+			expect(standing?.standing).toBe('clear');
+			expect(standing?.href).toBeNull();
+		});
+
+		/**
+		 * A subscription that changed underneath the request. Half a claim is worse than none, so
+		 * the module contributes nothing — and `composeStanding` simply has one fewer point.
+		 */
+		it('says nothing at all when the module is not owned and has nothing in it', async () => {
+			const t = await homeTenant();
+
+			const summary = await homeSays(t);
+
+			expect(summary.standing).toBeNull();
+			expect(summary.resume).toEqual([]);
+		});
+
+		it('counts what is there and states the zero rather than hiding it', async () => {
+			const t = await homeTenant();
+			await addItem(t, 'European oak, 40mm board', { reorder: units(12), qty: units(40) });
+			await addItem(t, 'Birch ply, 18mm sheet', { reorder: units(5), qty: units(30) });
+
+			const { standing } = await homeSays(t);
+
+			expect(standing).toMatchObject({
+				module: 'inventory',
+				standing: 'clear',
+				statement: '2 items counted',
+				explanation: 'None running low.',
+				href: '/inventory'
+			});
+		});
+
+		it('names the item that is running low, rather than saying "check your stock"', async () => {
+			const t = await homeTenant();
+			await addItem(t, 'Danish oil, 5L', { reorder: units(12), qty: units(4) });
+			await addItem(t, 'European oak, 40mm board', { reorder: units(12), qty: units(40) });
+
+			const { standing } = await homeSays(t);
+
+			expect(standing?.standing).toBe('attention');
+			expect(standing?.statement).toBe('1 item is running low');
+			expect(standing?.explanation).toBe('Danish oil, 5L. Out of 2 items you count.');
+			// One click from the sentence to the three items it is about.
+			expect(standing?.href).toBe('/inventory?filter=low');
+		});
+
+		/**
+		 * Two names, then a count — and the names come back ALPHABETICAL, so the ticket's
+		 * illustrative "European oak, Danish oil and one other" reads the other way round here.
+		 */
+		it('names two and counts the rest', async () => {
+			const t = await homeTenant();
+			for (const name of ['European oak', 'Danish oil', 'Sash clamp', 'Brass screws']) {
+				await addItem(t, name, { reorder: units(12), qty: units(4) });
+			}
+			await addItem(t, 'Birch ply', { reorder: units(1), qty: units(30) });
+
+			const { standing } = await homeSays(t);
+
+			expect(standing?.statement).toBe('4 items are running low');
+			expect(standing?.explanation).toBe(
+				'Brass screws · Danish oil · and 2 others. Out of 5 items you count.'
+			);
+		});
+
+		/**
+		 * THE NUMBER ON HOME IS THE NUMBER ON THE TAB. Both come from `lowPredicate`, and this is
+		 * the assertion that keeps them from drifting apart — including at the boundary, where a
+		 * second definition would first disagree.
+		 */
+		it('agrees with the list, including exactly at the reorder point', async () => {
+			const t = await homeTenant();
+			await addItem(t, 'Below', { reorder: units(12), qty: units(11) });
+			await addItem(t, 'Exactly at', { reorder: units(12), qty: units(12) });
+			await addItem(t, 'Above', { reorder: units(12), qty: units(13) });
+
+			const { standing } = await homeSays(t);
+			const counts = await runScoped(t.businessId, t.userId, (tx) => countItems(tx));
+
+			expect(counts.low).toBe(1);
+			expect(standing?.statement).toBe('1 item is running low');
+			// The one exactly at its point is not a concern — `isBelowReorderPoint` is strictly below.
+			expect(standing?.explanation).toBe('Below. Out of 3 items you count.');
+		});
+
+		/**
+		 * An archived item reports as archived and nothing else. Urgency about stock the business
+		 * has said it no longer keeps would be the interface arguing with a decision already made.
+		 */
+		it('leaves archived items out of both numbers', async () => {
+			const t = await homeTenant();
+			const gone = await addItem(t, 'Danish oil, 5L', { reorder: units(12), qty: units(4) });
+			await addItem(t, 'European oak, 40mm board', { reorder: units(12), qty: units(40) });
+
+			expect((await homeSays(t)).standing?.standing).toBe('attention');
+
+			await runScoped(t.businessId, t.userId, (tx) => archiveItem(tx, gone));
+
+			const { standing } = await homeSays(t);
+			expect(standing?.standing).toBe('clear');
+			expect(standing?.statement).toBe('1 item counted');
+		});
+	});
+
+	/**
+	 * THE ACCEPTANCE CRITERION AS A TEST, not as a promise in a comment. Stock on hand is an asset,
+	 * not money in or out this month, and the day somebody adds a valuation to the month panel this
+	 * is what stops it.
+	 */
+	it('contributes no figure and nothing dated, ever', async () => {
+		const t = await homeTenant();
+		await addItem(t, 'European oak, 40mm board', { cost: rand(1780), qty: units(40) });
+
+		const healthy = await homeSays(t);
+		expect(healthy.figures).toEqual([]);
+		expect(healthy.agenda).toEqual([]);
+
+		await addItem(t, 'Danish oil, 5L', { cost: rand(420), reorder: units(12), qty: units(1) });
+
+		const concerned = await homeSays(t);
+		expect(concerned.standing?.standing).toBe('attention');
+		expect(concerned.figures).toEqual([]);
+		expect(concerned.agenda).toEqual([]);
+	});
+
+	describe('the stock count you can come back to', () => {
+		/** Four items, a count prepared over them, and the first `counted` of them counted. */
+		async function countOf(t: HomeSeeded, counted: number) {
+			for (const n of [1, 2, 3, 4]) await addItem(t, `Item ${n}`, { qty: units(10) });
+
+			const countId = await runScoped(t.businessId, t.userId, (tx) =>
+				prepareCount(tx, t.businessId, t.userId, { start: '2026-07-01', end: '2026-07-31' })
+			);
+
+			await runScoped(t.businessId, t.userId, async (tx) => {
+				const lines = await tx
+					.select({ id: stockCountLine.id })
+					.from(stockCountLine)
+					.where(eq(stockCountLine.stockCountId, countId))
+					.orderBy(asc(stockCountLine.position));
+
+				for (const line of lines.slice(0, counted)) {
+					await saveCountLine(tx, line.id, units(10), t.userId);
+				}
+			});
+
+			return countId;
+		}
+
+		it('offers nothing when there is no count', async () => {
+			const t = await homeTenant();
+			await addItem(t, 'European oak, 40mm board');
+
+			expect((await homeSays(t)).resume).toEqual([]);
+		});
+
+		it('names the count, its progress, and where to go back to', async () => {
+			const t = await homeTenant();
+			const countId = await countOf(t, 2);
+
+			const { resume } = await homeSays(t);
+
+			expect(resume).toHaveLength(1);
+			expect(resume[0]).toEqual({
+				module: 'inventory',
+				id: countId,
+				title: 'Stock count · July',
+				context: '2 of 4 counted',
+				href: `/inventory/count/${countId}`
+			});
+		});
+
+		/** Nobody has started yet, but there IS something to come back to. */
+		it('shows a count nobody has counted anything on', async () => {
+			const t = await homeTenant();
+			await countOf(t, 0);
+
+			expect((await homeSays(t)).resume[0].context).toBe('0 of 4 counted');
+		});
+
+		/**
+		 * The un-count path. "Actually, I have not looked at this one yet" has to move the progress
+		 * back, which it only does if the card reads the NULL rather than a counter.
+		 */
+		it('moves the progress back when a line is un-counted', async () => {
+			const t = await homeTenant();
+			const countId = await countOf(t, 2);
+
+			await runScoped(t.businessId, t.userId, async (tx) => {
+				const [line] = await tx
+					.select({ id: stockCountLine.id })
+					.from(stockCountLine)
+					.where(eq(stockCountLine.stockCountId, countId))
+					.orderBy(asc(stockCountLine.position));
+
+				await saveCountLine(tx, line.id, null, t.userId);
+			});
+
+			expect((await homeSays(t)).resume[0].context).toBe('1 of 4 counted');
+		});
+
+		/** A count at review has committed nothing yet, so it is still work to come back to. */
+		it('still offers a count that has reached review', async () => {
+			const t = await homeTenant();
+			const countId = await countOf(t, 4);
+
+			// SPA-7 owns this transition; the trigger already permits counting -> reviewing.
+			await runScoped(t.businessId, t.userId, (tx) =>
+				tx.update(stockCount).set({ status: 'reviewing' }).where(eq(stockCount.id, countId))
+			);
+
+			expect((await homeSays(t)).resume[0].id).toBe(countId);
+		});
+
+		it('offers nothing once the count has been applied', async () => {
+			const t = await homeTenant();
+			const countId = await countOf(t, 4);
+
+			await runScoped(t.businessId, t.userId, (tx) =>
+				applyCount(tx, t.businessId, countId, t.userId)
+			);
+
+			expect((await homeSays(t)).resume).toEqual([]);
+		});
+
+		/**
+		 * One card, never a list — and the one shown is the count most recently STARTED. Ordering
+		 * on `updatedAt` would be wrong here in a way that only shows up in use: counting an item
+		 * updates the LINE, and the header's touch trigger fires only when the header itself moves.
+		 */
+		it('offers only the most recently started count', async () => {
+			const t = await homeTenant();
+			await countOf(t, 1);
+			const newer = await runScoped(t.businessId, t.userId, (tx) =>
+				prepareCount(tx, t.businessId, t.userId, { start: '2026-08-01', end: '2026-08-31' })
+			);
+
+			const { resume } = await homeSays(t);
+
+			expect(resume).toHaveLength(1);
+			expect(resume[0].id).toBe(newer);
+			expect(resume[0].title).toBe('Stock count · August');
+		});
+
+		/** A business with nothing placed anywhere gets a count with no lines in it. */
+		it('does not claim progress on a count with no lines', async () => {
+			const t = await homeTenant();
+			await runScoped(t.businessId, t.userId, (tx) =>
+				prepareCount(tx, t.businessId, t.userId, { start: '2026-07-01', end: '2026-07-31' })
+			);
+
+			expect((await homeSays(t)).resume[0].context).toBe('Nothing to count yet');
 		});
 	});
 });
