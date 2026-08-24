@@ -11,6 +11,8 @@
 	 * sentence would have to pick one. It comes straight from `inventory_level`, which is the
 	 * visible payoff of the view: no code assembles those numbers, they are the movements.
 	 */
+	import Archive from '@lucide/svelte/icons/archive';
+	import ArchiveRestore from '@lucide/svelte/icons/archive-restore';
 	import Package from '@lucide/svelte/icons/package';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import {
@@ -63,7 +65,9 @@
 		pageCount,
 		pageHref,
 		readOnly = false,
-		onedit
+		onedit,
+		onarchive,
+		onrestore
 	}: {
 		item: InventoryItem;
 		sku: string | null;
@@ -78,7 +82,11 @@
 		pageHref: (page: number) => string;
 		readOnly?: boolean;
 		onedit?: () => void;
+		onarchive?: () => void;
+		onrestore?: () => void;
 	} = $props();
+
+	const archived = $derived(item.archivedAt !== null);
 </script>
 
 <!-- eslint-disable svelte/no-navigation-without-resolve -->
@@ -111,16 +119,54 @@
 			<!-- "12 board on hand in Rack A. Reorder at 12." — pure, tested, one sentence. -->
 			<p class="mt-1 text-ui text-ink-secondary">{standingSentence(item, onHand, locationName)}</p>
 
+			<!--
+				The consequence, stated before the action rather than in a dialog after it. Archiving
+				is reversible and says so; an archived item says what being archived means, so nobody
+				has to work out why it stopped appearing in their counts.
+			-->
+			{#if archived}
+				<p class="mt-2 max-w-[520px] text-helper text-ink-muted">
+					Archived. It keeps every movement it ever had, and stays out of your stock list, your
+					running-low count and your valuation until you restore it.
+				</p>
+			{:else if !readOnly}
+				<p class="mt-2 max-w-[520px] text-helper text-ink-muted">
+					Archiving takes an item out of your list without losing any of its history, and you can
+					restore it at any time.
+				</p>
+			{/if}
+
 			{#if description}
 				<p class="mt-2 max-w-[520px] text-ui text-ink-secondary">{description}</p>
 			{/if}
 		</div>
 
 		{#if !readOnly}
-			<Button variant="secondary" onclick={onedit}>
-				<Pencil class="size-4" aria-hidden="true" />
-				Edit
-			</Button>
+			<div class="flex items-center gap-2">
+				<Button variant="secondary" onclick={onedit}>
+					<Pencil class="size-4" aria-hidden="true" />
+					Edit
+				</Button>
+				<!--
+					ARCHIVING IS REVERSIBLE, SO IT GETS A BUTTON AND NOT A DIALOG.
+					`CancelInvoiceDialog` exists because cancelling is a one-way door — "a one-way door
+					with a one-click handle is the exact failure the sentence exists to prevent."
+					Discarding a draft, which is the same shape as this, is a plain secondary button.
+					The consequence is stated beneath rather than in a dialog after the fact, which is
+					T21's rule: the interface says what will happen BEFORE the action.
+				-->
+				{#if archived}
+					<Button variant="secondary" onclick={onrestore}>
+						<ArchiveRestore class="size-4" aria-hidden="true" />
+						Restore
+					</Button>
+				{:else}
+					<Button variant="quiet" onclick={onarchive}>
+						<Archive class="size-4" aria-hidden="true" />
+						Archive
+					</Button>
+				{/if}
+			</div>
 		{/if}
 	</div>
 

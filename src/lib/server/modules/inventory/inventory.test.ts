@@ -20,7 +20,7 @@ import {
 	createUser,
 	messageFromRejection
 } from '$lib/server/core/db/fixtures';
-import { createItem, recordMovement, CannotDoThat } from './effects';
+import { archiveItem, createItem, recordMovement, restoreItem, CannotDoThat } from './effects';
 import { applyCount, prepareCount, reviewCount, saveCountLine } from './counts';
 import { countItems, listItems, listMovements, loadItem, summarise } from './queries';
 
@@ -224,6 +224,87 @@ describe('the list', () => {
 			expect(s.uncosted).toBe(1);
 			expect(formatZar(s.valueAtCost)).toBe(nb('R1 000,00'));
 		});
+	});
+});
+
+describe('archiving an item', () => {
+	/**
+	 * The tab existed before the button did. These assert the round trip the screen now drives,
+	 * so an item can actually reach the `archived` state it was always able to be filtered by.
+	 */
+	it('takes the item out of the list, the low count and the valuation', async () => {
+		const t = await tenant();
+		const id = await addItem(t, 'Beeswax polish, 1L', {
+			cost: rand(180),
+			reorder: units(6),
+			qty: units(2)
+		});
+
+		await runScoped(t.businessId, t.userId, async (tx) => {
+			const before = await countItems(tx);
+			expect(before).toEqual({ all: 1, low: 1, archived: 0 });
+			expect((await summarise(tx)).itemCount).toBe(1);
+
+			await archiveItem(tx, id);
+
+			const after = await countItems(tx);
+			expect(after).toEqual({ all: 0, low: 0, archived: 1 });
+			// An archived item is never "running low", however little is left — the business has
+			// said it no longer stocks the thing.
+			expect((await listItems(tx, { filter: 'low' })).items).toHaveLength(0);
+			expect((await listItems(tx, { filter: 'archived' })).items.map((r) => r.item.name)).toEqual([
+				'Beeswax polish, 1L'
+			]);
+			expect((await summarise(tx)).itemCount).toBe(0);
+		});
+	});
+
+	/** Archiving loses nothing. The movements are the history of stock the business really had. */
+	it('keeps every movement, and the quantity comes back with it', async () => {
+		const t = await tenant();
+		// Reorder point well below the quantity, so "is it low" is not what this test is about.
+		const id = await addItem(t, 'Danish oil, 5L', { reorder: units(4), qty: units(8) });
+
+		await runScoped(t.businessId, t.userId, async (tx) => {
+			await archiveItem(tx, id);
+
+			const whileArchived = await loadItem(tx, id);
+			expect(whileArchived?.item.archivedAt).not.toBeNull();
+			expect(whileArchived?.onHand.e6).toBe(units(8));
+			expect((await listMovements(tx, id)).total).toBe(1);
+
+			await restoreItem(tx, id);
+
+			const restored = await loadItem(tx, id);
+			expect(restored?.item.archivedAt).toBeNull();
+			expect(restored?.onHand.e6).toBe(units(8));
+			expect(await countItems(tx)).toEqual({ all: 1, low: 0, archived: 0 });
+		});
+	});
+
+	it('refuses to archive something already archived', async () => {
+		const t = await tenant();
+		const id = await addItem(t, 'Iroko, 25mm board');
+
+		await runScoped(t.businessId, t.userId, (tx) => archiveItem(tx, id));
+
+		const message = await messageFromRejection(
+			runScoped(t.businessId, t.userId, (tx) => archiveItem(tx, id))
+		);
+		expect(message).toMatch(/already archived/i);
+	});
+
+	/** Not a deletion — the application role holds no DELETE anywhere in `public`. */
+	it('is an update, not a delete', async () => {
+		const t = await tenant();
+		const id = await addItem(t, 'Walnut veneer sheet');
+
+		const message = await messageFromRejection(
+			runScoped(t.businessId, t.userId, (tx) =>
+				tx.execute(sql`delete from inventory_item where id = ${id}`)
+			)
+		);
+		expect(message).toMatch(/permission denied/i);
 	});
 });
 
