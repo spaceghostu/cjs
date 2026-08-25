@@ -267,6 +267,29 @@ const architectureZones = [
 				}
 			]
 		}
+	},
+
+	// 11. The validation core is entered through its barrel, exactly as money is. The barrel
+	//     is where THE STANDARD is written down, and a file that imports `./zod` or `./copy`
+	//     directly has walked past the only place that explains what a message owes a person.
+	//     The boundary goes in before the first line of code reaches around it.
+	{
+		files: ['src/**/*.{ts,js,svelte}'],
+		ignores: ['src/lib/core/validation/**', 'src/**/*.test.ts', 'src/**/*.spec.ts'],
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					patterns: [
+						{
+							group: ['$lib/core/validation/*', '**/core/validation/*'],
+							message:
+								'Import from $lib/core/validation. The barrel carries the message standard; reaching past it is how a boundary quietly grows a second front door.'
+						}
+					]
+				}
+			]
+		}
 	}
 ];
 

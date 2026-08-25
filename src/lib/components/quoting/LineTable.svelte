@@ -22,8 +22,9 @@
 	 */
 	import Plus from '@lucide/svelte/icons/plus';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import { Amount, Input } from '$lib/ui';
-	import { priceIssue, qtyIssue, type EditorLine } from '$lib/core/quoting';
+	import { Amount, FieldError, Input } from '$lib/ui';
+	import { checkQuantity, checkUnitPrice } from '$lib/core/validation';
+	import type { EditorLine } from '$lib/core/quoting';
 	import type { Money } from '$lib/core/money';
 	import type { Snippet } from 'svelte';
 
@@ -60,8 +61,17 @@
 		</div>
 
 		{#each lines as line, i (line.id)}
-			{@const qtyProblem = qtyIssue(line.qty)}
-			{@const priceProblem = priceIssue(line.unitPrice)}
+			<!--
+				The money core is asked, and its answer is handed to the message as it stands. An
+				empty box is not a complaint — a line somebody has started but not priced is a
+				normal state of a draft, and "Enter an amount." under every new row would be the
+				table nagging about work in progress.
+			-->
+			{@const qty = line.qty.trim() === '' ? null : checkQuantity(line.qty)}
+			{@const price = line.unitPrice.trim() === '' ? null : checkUnitPrice(line.unitPrice)}
+			{@const qtyBad = qty !== null && !qty.ok}
+			{@const priceBad = price !== null && !price.ok}
+			{@const messageId = `quote-line-${line.id}-message`}
 			<div class="grid {COLUMNS} items-start gap-3 border-b border-line-row px-3 py-2.5">
 				<div class="min-w-0">
 					<!--
@@ -86,7 +96,8 @@
 						class="h-8 px-2 text-right"
 						inputmode="decimal"
 						aria-label="Item {i + 1} quantity"
-						aria-invalid={qtyProblem ? 'true' : undefined}
+						aria-invalid={qtyBad ? 'true' : undefined}
+						aria-describedby={qtyBad ? messageId : undefined}
 						bind:value={line.qty}
 					/>
 				</div>
@@ -97,7 +108,8 @@
 						class="h-8 px-2 text-right"
 						inputmode="decimal"
 						aria-label="Item {i + 1} unit price"
-						aria-invalid={priceProblem ? 'true' : undefined}
+						aria-invalid={priceBad ? 'true' : undefined}
+						aria-describedby={priceBad && !qtyBad ? messageId : undefined}
 						bind:value={line.unitPrice}
 					/>
 				</div>
@@ -116,8 +128,14 @@
 					</button>
 				</div>
 
-				{#if qtyProblem || priceProblem}
-					<p class="col-span-4 text-helper text-wrong-ink">{qtyProblem ?? priceProblem}</p>
+				<!--
+					One message per row, spanning it, rather than one under each of two 68px and
+					108px cells. Quantity speaks first when both are unreadable: it is the number a
+					person types first, and two complaints about one line reads as the row being
+					broken rather than as two characters needing a look.
+				-->
+				{#if qtyBad || priceBad}
+					<FieldError id={messageId} result={qtyBad ? qty : price} class="col-span-4" />
 				{/if}
 			</div>
 		{/each}

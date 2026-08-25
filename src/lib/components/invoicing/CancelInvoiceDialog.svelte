@@ -26,8 +26,8 @@
 		DialogFooter,
 		DialogHeader,
 		DialogTitle,
-		Input,
-		Label
+		Field,
+		Input
 	} from '$lib/ui';
 
 	let {
@@ -66,21 +66,22 @@
 				</DialogDescription>
 			</DialogHeader>
 
-			<div class="mt-4">
-				<Label for="cancel-reason">Why (optional)</Label>
-				<div class="mt-1.5">
+			<Field
+				label="Why (optional)"
+				id="cancel-reason"
+				class="mt-4"
+				helper="Goes onto the record, for whoever reads this in a year."
+			>
+				{#snippet control(field)}
 					<Input
-						id="cancel-reason"
+						{...field}
 						name="reason"
 						bind:value={reason}
 						autocomplete="off"
 						placeholder="Client changed their mind"
 					/>
-				</div>
-				<p class="mt-1.5 text-helper text-ink-muted">
-					Goes onto the record, for whoever reads this in a year.
-				</p>
-			</div>
+				{/snippet}
+			</Field>
 
 			<DialogFooter class="mt-5">
 				<!-- The safe choice is the one that looks like a button; cancelling is the destructive one. -->

@@ -18,6 +18,7 @@
 	 * interface misreading good news as a lack. The branch is on `counts`, not on `items.length`,
 	 * because that is the difference between "you have nothing" and "nothing matched".
 	 */
+	import ClipboardList from '@lucide/svelte/icons/clipboard-list';
 	import Package from '@lucide/svelte/icons/package';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { Button } from '$lib/ui';
@@ -98,10 +99,32 @@
 		</div>
 
 		{#if !readOnly}
-			<Button onclick={oncreate} class="hidden lg:inline-flex">
-				<Plus class="size-4" aria-hidden="true" />
-				New item
-			</Button>
+			<div class="hidden items-center gap-2 lg:flex">
+				<!--
+					THE WAY INTO THE COUNT FLOW. A form rather than a link, because starting a count
+					WRITES — it allocates a document number and snapshots a line per shelf — and a
+					GET that changes something is a GET a browser is entitled to prefetch.
+
+					Secondary, beside the primary. Counting stock is the bigger job of the two, but
+					it is the rarer one: most visits to this screen are somebody looking something
+					up, and the month-end count should not be the loudest thing on the page.
+
+					The action resumes an open count rather than starting a second one — see
+					`+page.server.ts`, which is also where the note about this entry point being an
+					implementation judgement rather than the design's lives.
+				-->
+				<form method="POST" action="?/count">
+					<Button type="submit" variant="secondary">
+						<ClipboardList class="size-4" aria-hidden="true" />
+						Count stock
+					</Button>
+				</form>
+
+				<Button onclick={oncreate}>
+					<Plus class="size-4" aria-hidden="true" />
+					New item
+				</Button>
+			</div>
 		{/if}
 	</div>
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	// STUB AWAITING DESIGN (T06). See +page.server.ts.
-	import { Button, Card, CardContent, Input, Label, Separator } from '$lib/ui';
+	import { Button, Card, CardContent, Field, FieldError, Input, Separator } from '$lib/ui';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -53,87 +53,92 @@
 
 		{#if mode === 'magic'}
 			<form method="POST" action="?/magic" class="space-y-4">
-				<div class="space-y-2">
-					<Label for="magic-email">Email</Label>
-					<Input
-						id="magic-email"
-						name="email"
-						type="email"
-						autocomplete="email"
-						required
-						value={form?.email ?? ''}
-						aria-invalid={form?.magic ? 'true' : undefined}
-						aria-describedby={form?.magic ? 'magic-error' : undefined}
-					/>
-					{#if form?.magic}
-						<p id="magic-error" class="text-xs text-wrong">{form.magic}</p>
-					{/if}
-				</div>
+				<!--
+					The email comes back in the field it was typed into. A sign-in that empties the
+					box on a rejected address makes somebody with a long work address type it twice
+					to find out it was right the first time.
+				-->
+				<Field label="Email" id="magic-email" error={form?.magic}>
+					{#snippet control(field)}
+						<Input
+							{...field}
+							name="email"
+							type="email"
+							autocomplete="email"
+							required
+							value={form?.email ?? ''}
+						/>
+					{/snippet}
+				</Field>
 				<Button type="submit" class="w-full">Email me a sign-in link</Button>
 			</form>
 		{:else if mode === 'password'}
 			<form method="POST" action="?/password" class="space-y-4">
-				<div class="space-y-2">
-					<Label for="email">Email</Label>
-					<Input
-						id="email"
-						name="email"
-						type="email"
-						autocomplete="email"
-						required
-						value={form?.email ?? ''}
-					/>
-				</div>
-				<div class="space-y-2">
-					<Label for="password">Password</Label>
-					<Input
-						id="password"
-						name="password"
-						type="password"
-						autocomplete="current-password"
-						required
-						aria-invalid={form?.password ? 'true' : undefined}
-						aria-describedby={form?.password ? 'password-error' : undefined}
-					/>
-					{#if form?.password}
-						<p id="password-error" class="text-xs text-wrong">{form.password}</p>
-					{/if}
-				</div>
+				<Field label="Email" id="email">
+					{#snippet control(field)}
+						<Input
+							{...field}
+							name="email"
+							type="email"
+							autocomplete="email"
+							required
+							value={form?.email ?? ''}
+						/>
+					{/snippet}
+				</Field>
+				<!--
+					The message sits under the PASSWORD even when the email is the half that is
+					wrong. Saying which of the two did not match is how an attacker finds out an
+					address has an account here.
+				-->
+				<Field label="Password" id="password" error={form?.password}>
+					{#snippet control(field)}
+						<Input
+							{...field}
+							name="password"
+							type="password"
+							autocomplete="current-password"
+							required
+						/>
+					{/snippet}
+				</Field>
 				<Button type="submit" class="w-full">Sign in</Button>
 			</form>
 		{:else}
 			<form method="POST" action="?/register" class="space-y-4">
-				<div class="space-y-2">
-					<Label for="name">Your name</Label>
-					<Input id="name" name="name" autocomplete="name" required value={form?.name ?? ''} />
-				</div>
-				<div class="space-y-2">
-					<Label for="new-email">Email</Label>
-					<Input
-						id="new-email"
-						name="email"
-						type="email"
-						autocomplete="email"
-						required
-						value={form?.email ?? ''}
-					/>
-				</div>
-				<div class="space-y-2">
-					<Label for="new-password">Password</Label>
-					<Input
-						id="new-password"
-						name="password"
-						type="password"
-						autocomplete="new-password"
-						required
-						aria-invalid={form?.register ? 'true' : undefined}
-						aria-describedby={form?.register ? 'register-error' : undefined}
-					/>
-					<p class="text-xs text-ink-muted">At least 8 characters.</p>
-					{#if form?.register}
-						<p id="register-error" class="text-xs text-wrong">{form.register}</p>
-					{/if}
-				</div>
+				<Field label="Your name" id="name">
+					{#snippet control(field)}
+						<Input {...field} name="name" autocomplete="name" required value={form?.name ?? ''} />
+					{/snippet}
+				</Field>
+				<Field label="Email" id="new-email">
+					{#snippet control(field)}
+						<Input
+							{...field}
+							name="email"
+							type="email"
+							autocomplete="email"
+							required
+							value={form?.email ?? ''}
+						/>
+					{/snippet}
+				</Field>
+				<Field
+					label="Password"
+					id="new-password"
+					error={form?.register}
+					helper="At least 8 characters."
+				>
+					{#snippet control(field)}
+						<Input
+							{...field}
+							name="password"
+							type="password"
+							autocomplete="new-password"
+							required
+						/>
+					{/snippet}
+				</Field>
 				<Button type="submit" class="w-full">Create your account</Button>
 			</form>
 		{/if}
@@ -165,9 +170,12 @@
 		{#if hasProvider}
 			<div class="space-y-3">
 				<Separator />
-				{#if form?.social}
-					<p class="text-xs text-wrong">{form.social}</p>
-				{/if}
+				<!--
+					No field to anchor to — the provider is chosen by pressing a button — so this is
+					the message atom on its own rather than a `Field`. Same sentence, same colour,
+					same 12px as every other refusal on the screen.
+				-->
+				<FieldError error={form?.social} />
 				<div class="grid gap-2">
 					{#if data.providers.google}
 						<form method="POST" action="?/social">

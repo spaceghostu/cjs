@@ -19,6 +19,7 @@
 	 * which for the button that brings a business's stock into existence is worth more than the
 	 * animation it costs.
 	 */
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import {
 		Button,
@@ -28,10 +29,12 @@
 		DialogFooter,
 		DialogHeader,
 		DialogTitle,
+		Field,
 		Input,
-		Label
+		MoneyField
 	} from '$lib/ui';
 	import { COMMON_UNITS, type InventoryItem } from '$lib/core/inventory';
+	import { checkQuantity, checkUnitPrice } from '$lib/core/validation';
 	import { quantityToDecimalString, unitPriceToDecimalString } from '$lib/core/money';
 
 	let {
@@ -59,15 +62,42 @@
 	const action = $derived(mode === 'create' ? '?/create' : '?/update');
 
 	/**
-	 * Existing values as a person would type them.
+	 * THE FOUR NUMERIC FIELDS ARE STATE, NOT DERIVED VALUES.
 	 *
-	 * Through the sanctioned formatters, never `toFixed` — which is import-banned, and would
-	 * quietly turn `R33.333333` per board-metre into `R33.33` the moment somebody opened the
-	 * dialog and saved without touching the field.
+	 * They have to be, for the fields to be able to say anything about what is in them while
+	 * somebody types. Seeded from the item through the sanctioned formatters — never `toFixed`,
+	 * which is import-banned and would quietly turn `R33.333333` per board-metre into `R33.33`
+	 * the moment somebody opened this dialog and saved without touching the field.
+	 *
+	 * Re-seeded ON OPEN AND ONLY ON OPEN. The read is wrapped in `untrack` so the effect depends
+	 * on `open` alone: a later change to `item` — a reload, a sibling save — must not reach in
+	 * and overwrite a number somebody is halfway through correcting. That is the same promise
+	 * the rest of this ticket makes about invalid input, kept for valid input too.
 	 */
-	const costValue = $derived(item?.costPrice ? unitPriceToDecimalString(item.costPrice) : '');
-	const sellValue = $derived(item?.sellPrice ? unitPriceToDecimalString(item.sellPrice) : '');
-	const reorderValue = $derived(item ? quantityToDecimalString(item.reorderPoint) : '');
+	let cost = $state('');
+	let sell = $state('');
+	let reorderPoint = $state('');
+	let openingQty = $state('');
+
+	$effect(() => {
+		if (!open) return;
+		untrack(() => {
+			cost = item?.costPrice ? unitPriceToDecimalString(item.costPrice) : '';
+			sell = item?.sellPrice ? unitPriceToDecimalString(item.sellPrice) : '';
+			reorderPoint = item ? quantityToDecimalString(item.reorderPoint) : '';
+			openingQty = '';
+		});
+	});
+
+	/**
+	 * What the money core makes of each of them. A courtesy — the server parses every one of
+	 * these again with the same functions — and blank is never a complaint here: all four are
+	 * optional, and three of them say so in their own helper text.
+	 */
+	const costCheck = $derived(cost.trim() === '' ? null : checkUnitPrice(cost));
+	const sellCheck = $derived(sell.trim() === '' ? null : checkUnitPrice(sell));
+	const reorderCheck = $derived(reorderPoint.trim() === '' ? null : checkQuantity(reorderPoint));
+	const openingCheck = $derived(openingQty.trim() === '' ? null : checkQuantity(openingQty));
 </script>
 
 <Dialog bind:open>
@@ -78,7 +108,12 @@
 			use:enhance={() => {
 				busy = true;
 				return async ({ update }) => {
-					await update();
+					// `reset: false` because four of these fields are bound state and the other four
+					// are not. A native form reset clears the DOM value of an input whose value the
+					// component is driving, leaving the price boxes looking empty while the state
+					// behind them still holds what was just saved. `?/create` redirects and `?/update`
+					// re-seeds on the next open, so there was nothing for the reset to do anyway.
+					await update({ reset: false });
 					busy = false;
 				};
 			}}
@@ -99,31 +134,29 @@
 			{/if}
 
 			<div class="mt-4 flex flex-col gap-4">
-				<div>
-					<Label for="item-name">Name</Label>
-					<div class="mt-1.5">
+				<Field label="Name" id="item-name">
+					{#snippet control(field)}
 						<Input
-							id="item-name"
+							{...field}
 							name="name"
 							value={item?.name ?? ''}
 							placeholder="European oak, 40mm board"
 							autocomplete="off"
 							required
 						/>
-					</div>
-				</div>
+					{/snippet}
+				</Field>
 
 				<div class="grid grid-cols-2 gap-4">
-					<div>
-						<Label for="item-unit">Unit</Label>
-						<div class="mt-1.5">
+					<Field label="Unit" id="item-unit">
+						{#snippet control(field)}
 							<!--
 								A `<datalist>`, not a `<select>`. The suggestions cover most trades and none of
 								them covers all — a joinery's board-metre and a cafe's punnet are the same
 								concept, and a closed list would be wrong for one of them on day one.
 							-->
 							<Input
-								id="item-unit"
+								{...field}
 								name="unit"
 								list="item-units"
 								value={item?.unitOfMeasure ?? 'each'}
@@ -134,87 +167,68 @@
 									<option value={unit}></option>
 								{/each}
 							</datalist>
-						</div>
-					</div>
+						{/snippet}
+					</Field>
 
-					<div>
-						<Label for="item-sku">Your code <span class="text-ink-muted">(optional)</span></Label>
-						<div class="mt-1.5">
+					<Field label="Your code (optional)" id="item-sku">
+						{#snippet control(field)}
 							<Input
-								id="item-sku"
+								{...field}
 								name="sku"
 								value={sku ?? ''}
 								autocomplete="off"
 								placeholder="OAK-40"
 							/>
-						</div>
-					</div>
+						{/snippet}
+					</Field>
 				</div>
 
 				<div class="grid grid-cols-2 gap-4">
-					<div>
-						<!--
-							`inputmode="decimal"` so a phone offers the right keypad. Parsed by
-							`parseUnitPriceInput` on the server — never `parseFloat`, which is import-banned
-							for exactly this field.
-						-->
-						<Label for="item-cost">What it costs you</Label>
-						<div class="mt-1.5">
-							<Input
-								id="item-cost"
-								name="cost"
-								value={costValue}
-								inputmode="decimal"
-								autocomplete="off"
-								placeholder="1780.00"
-							/>
-						</div>
-						<p class="mt-1 text-helper text-ink-muted">
-							Per {item?.unitOfMeasure ?? 'unit'}. Leave blank if you do not know.
-						</p>
-					</div>
+					<!--
+						`parseUnitPriceInput` reads these, in the browser as a courtesy and on the server
+						as the decision — never `parseFloat`, which is import-banned for exactly these
+						fields.
+					-->
+					<MoneyField
+						label="What it costs you"
+						id="item-cost"
+						name="cost"
+						bind:value={cost}
+						result={costCheck}
+						placeholder="1780.00"
+						helper="Per {item?.unitOfMeasure ?? 'unit'}. Leave blank if you do not know."
+					/>
 
-					<div>
-						<Label for="item-sell">What you sell it for</Label>
-						<div class="mt-1.5">
-							<Input
-								id="item-sell"
-								name="sell"
-								value={sellValue}
-								inputmode="decimal"
-								autocomplete="off"
-								placeholder="2400.00"
-							/>
-						</div>
-					</div>
+					<MoneyField
+						label="What you sell it for"
+						id="item-sell"
+						name="sell"
+						bind:value={sell}
+						result={sellCheck}
+						placeholder="2400.00"
+					/>
 				</div>
 
 				<div class="grid grid-cols-2 gap-4">
-					<div>
-						<Label for="item-reorder">Tell me when it drops below</Label>
-						<div class="mt-1.5">
-							<Input
-								id="item-reorder"
-								name="reorderPoint"
-								value={reorderValue}
-								inputmode="decimal"
-								autocomplete="off"
-								placeholder="12"
-							/>
-						</div>
-						<p class="mt-1 text-helper text-ink-muted">Leave at 0 and we will not mention it.</p>
-					</div>
+					<MoneyField
+						label="Tell me when it drops below"
+						id="item-reorder"
+						name="reorderPoint"
+						bind:value={reorderPoint}
+						result={reorderCheck}
+						placeholder="12"
+						helper="Leave at 0 and we will not mention it."
+					/>
 
-					<div>
-						<Label for="item-location">Where it lives</Label>
-						<div class="mt-1.5">
+					<Field label="Where it lives" id="item-location">
+						{#snippet control(field)}
 							<!--
 								Free text with the existing places as suggestions, so a first item does not
 								require visiting a settings screen that does not exist. The server matches an
 								existing name case-insensitively before creating a new one.
 							-->
 							<Input
-								id="item-location"
+								{...field}
 								name="locationName"
 								value={locationName ?? ''}
 								list="item-locations"
@@ -226,27 +240,20 @@
 									<option value={place.name}></option>
 								{/each}
 							</datalist>
-						</div>
-					</div>
+						{/snippet}
+					</Field>
 				</div>
 
 				{#if mode === 'create'}
-					<div>
-						<Label for="item-opening">How many have you got right now?</Label>
-						<div class="mt-1.5">
-							<Input
-								id="item-opening"
-								name="openingQty"
-								inputmode="decimal"
-								autocomplete="off"
-								placeholder="40"
-							/>
-						</div>
-						<p class="mt-1 text-helper text-ink-muted">
-							We record this as an opening balance, so the quantity always has a history behind it.
-							Leave it blank if you would rather count later.
-						</p>
-					</div>
+					<MoneyField
+						label="How many have you got right now?"
+						id="item-opening"
+						name="openingQty"
+						bind:value={openingQty}
+						result={openingCheck}
+						placeholder="40"
+						helper="We record this as an opening balance, so the quantity always has a history behind it. Leave it blank if you would rather count later."
+					/>
 				{/if}
 			</div>
 

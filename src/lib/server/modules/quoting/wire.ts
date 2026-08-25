@@ -18,9 +18,24 @@
  *   - Text is bounded. A description is a description; nothing here needs a megabyte, and an
  *     unbounded text column reachable from an unauthenticated-adjacent surface is a way to
  *     fill somebody's disk.
+ *
+ * WHAT THE RULES SAY WHEN THEY FIRE, AND WHY IT IS NOT WRITTEN HERE ANY MORE
+ * -------------------------------------------------------------------------
+ * This file used to answer a refusal with `We couldn't save: ${path} ${message}` — which put
+ * "lines.3.qtyE6" in front of a person who was trying to price a job. The rules are still
+ * here; the WORDS now come from `$lib/core/validation`, which is the standard every message in
+ * the product is held to. Two consequences worth knowing before editing a message below:
+ *
+ *   - A rule with no message of its own gets the standard's copy, and the standard can say
+ *     "Line 4:" because `WORDS` below tells it what a `lines` row is called. A message written
+ *     here cannot: it is used verbatim, so it has to make sense on its own.
+ *   - `validUntil` hands its copy to `explainDate`, which knows that `2026-02-30` is the 30th
+ *     of a month with 28 days and can offer the day the person probably meant. A `refine` can
+ *     only say no.
  */
 import { z } from 'zod';
 import { MAX_CENTS } from '$lib/core/money';
+import { check, explainDate, type Checked, type Vocabulary } from '$lib/core/validation';
 import { PROMOTABLE_FIELDS, TAX_TREATMENTS, isCalendarDate } from '$lib/core/quoting';
 import type { DraftPatch } from '$lib/core/quoting/wire';
 
@@ -28,11 +43,14 @@ import type { DraftPatch } from '$lib/core/quoting/wire';
 const DESCRIPTION_MAX = 2_000;
 const NAME_MAX = 200;
 
+// No message on `.int()` on purpose: a non-integer here was never typed by anybody — the
+// browser's parsers produce these — so the standard's "something here is out of date" is both
+// truer and more useful than any sentence about whole numbers.
 const exactInteger = z
 	.number()
-	.int('must be a whole number')
-	.min(-MAX_CENTS, 'is too large to be exact')
-	.max(MAX_CENTS, 'is too large to be exact');
+	.int()
+	.min(-MAX_CENTS, 'That number is too large for us to keep exact')
+	.max(MAX_CENTS, 'That number is too large for us to keep exact');
 
 /** Trim, and read an empty string as absent. A cleared field means "no value", not "". */
 const optionalText = (max: number) =>
@@ -44,19 +62,21 @@ const optionalText = (max: number) =>
 		.nullable()
 		.default(null);
 
+// The message is the BACKSTOP, for a value `explainDate` looks at and has no quarrel with.
+// The interesting cases — no 13th month, the 30th of February — are its, not this line's.
 const calendarDate = z
 	.string()
-	.refine(isCalendarDate, 'is not a real date')
+	.refine(isCalendarDate, 'That date could not be read')
 	.nullable()
 	.default(null);
 
 const linePatch = z.object({
 	id: z.uuid(),
 	position: z.number().int().min(0).max(10_000),
-	description: z.string().min(1, 'needs a description').max(DESCRIPTION_MAX),
+	description: z.string().min(1).max(DESCRIPTION_MAX),
 	provenance: optionalText(DESCRIPTION_MAX),
 	documentDescription: optionalText(DESCRIPTION_MAX),
-	qtyE6: exactInteger.min(0, 'cannot be negative'),
+	qtyE6: exactInteger.min(0, 'A quantity cannot be negative'),
 	unitPriceMicros: exactInteger,
 	taxTreatment: z.enum(TAX_TREATMENTS),
 	sourceItemId: z.uuid().nullable().default(null)
@@ -100,21 +120,45 @@ export const promoteSchema = z.object({
 });
 
 /**
+ * THE WORDS THIS BOUNDARY LENDS THE STANDARD.
+ *
+ * Subjects for the fields a person actually types into, and the singular noun for a row so a
+ * message can say "Line 4" instead of naming an array index. Fields left out are not an
+ * oversight: a message about `customerId` or `sourceItemId` should not name them, because a
+ * person did not type them and would not recognise them.
+ */
+const WORDS: Vocabulary = {
+	rows: { lines: 'Line' },
+	fields: {
+		description: 'A description',
+		documentDescription: 'A description',
+		provenance: 'A note',
+		name: 'A name',
+		contactPerson: 'A contact name',
+		email: 'An email address',
+		sendToEmail: 'An email address',
+		phone: 'A phone number',
+		vatNumber: 'A VAT number',
+		validUntil: 'The valid-until date',
+		qtyE6: 'A quantity',
+		unitPriceMicros: 'A price'
+	},
+	explain: { validUntil: explainDate }
+};
+
+/**
  * Parse, or say what is wrong in language somebody can act on.
  *
  * Returns a result rather than throwing, because the caller is an autosave endpoint and the
  * right answer to "this quantity is not a number" is a message on that field — not a 500 and
  * a save indicator stuck on "saving…" forever.
+ *
+ * `Checked` rather than a shape of its own: the failure arm carries `problems`, each with the
+ * field it belongs to, so the editor can put a message on a line instead of at the top of the
+ * document. `.message` is still there for callers that only want a sentence.
  */
-export type ParsedPatch =
-	| { readonly ok: true; readonly patch: DraftPatch }
-	| { readonly ok: false; readonly message: string };
+export type ParsedPatch = Checked<DraftPatch>;
 
 export function parseDraftPatch(input: unknown): ParsedPatch {
-	const result = draftPatchSchema.safeParse(input);
-	if (result.success) return { ok: true, patch: result.data };
-
-	const first = result.error.issues[0];
-	const where = first.path.join('.') || 'that';
-	return { ok: false, message: `We couldn't save: ${where} ${first.message}.` };
+	return check(draftPatchSchema, input, WORDS);
 }

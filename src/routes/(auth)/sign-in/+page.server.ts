@@ -16,6 +16,7 @@ import { dev } from '$app/environment';
 import { fail, redirect, type Actions } from '@sveltejs/kit';
 import { z } from 'zod';
 import { APIError } from 'better-auth/api';
+import { check, type Vocabulary } from '$lib/core/validation';
 import { auth } from '$lib/server/auth';
 import { features } from '$lib/server/env';
 import type { PageServerLoad } from './$types';
@@ -30,6 +31,18 @@ const credentials = z.object({
 const registration = credentials.extend({
 	name: z.string().trim().min(1, 'Tell us what to call you')
 });
+
+/**
+ * What to call each field when the standard has to write the sentence itself.
+ *
+ * Every rule above already carries copy somebody wrote, and `check()` keeps it — so this is
+ * only reached when a field arrives missing or as the wrong shape, which on a sign-in form
+ * means a hand-made POST rather than a person. It still gets a sentence rather than
+ * "Invalid input: expected string, received undefined".
+ */
+const WORDS: Vocabulary = {
+	fields: { email: 'An email address', password: 'A password', name: 'Your name' }
+};
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	// Already signed in: nothing to do here. The business guard in hooks.server.ts decides
@@ -64,14 +77,16 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const email = String(form.get('email') ?? '');
 
-		const parsed = emailSchema.safeParse(email);
-		if (!parsed.success) {
-			return fail(400, { email, magic: parsed.error.issues[0].message });
+		const parsed = check(emailSchema, email, WORDS);
+		if (!parsed.ok) {
+			// The address goes back with the message. Retyping an email because one character
+			// was wrong is a small thing that feels like the product blaming you.
+			return fail(400, { email, magic: parsed.message });
 		}
 
 		try {
 			await auth().api.signInMagicLink({
-				body: { email: parsed.data, callbackURL: nextFrom(url) },
+				body: { email: parsed.value, callbackURL: nextFrom(url) },
 				headers: request.headers
 			});
 		} catch (error) {
@@ -99,13 +114,13 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const values = Object.fromEntries(form) as Record<string, string>;
 
-		const parsed = credentials.safeParse(values);
-		if (!parsed.success) {
-			return fail(400, { email: values.email, password: parsed.error.issues[0].message });
+		const parsed = check(credentials, values, WORDS);
+		if (!parsed.ok) {
+			return fail(400, { email: values.email, password: parsed.message });
 		}
 
 		try {
-			await auth().api.signInEmail({ body: parsed.data, headers: request.headers });
+			await auth().api.signInEmail({ body: parsed.value, headers: request.headers });
 		} catch (error) {
 			return fail(400, {
 				email: values.email,
@@ -120,17 +135,17 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const values = Object.fromEntries(form) as Record<string, string>;
 
-		const parsed = registration.safeParse(values);
-		if (!parsed.success) {
+		const parsed = check(registration, values, WORDS);
+		if (!parsed.ok) {
 			return fail(400, {
 				email: values.email,
 				name: values.name,
-				register: parsed.error.issues[0].message
+				register: parsed.message
 			});
 		}
 
 		try {
-			await auth().api.signUpEmail({ body: parsed.data, headers: request.headers });
+			await auth().api.signUpEmail({ body: parsed.value, headers: request.headers });
 		} catch (error) {
 			return fail(400, {
 				email: values.email,

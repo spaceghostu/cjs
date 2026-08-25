@@ -10,6 +10,7 @@
 import { building } from '$app/environment';
 import { env as runtime } from '$env/dynamic/private';
 import { z } from 'zod';
+import { explainToOperator } from '$lib/core/validation';
 
 /** Present-and-non-empty, or undefined. Blank strings in .env files are not values. */
 const optional = z
@@ -74,10 +75,12 @@ function load() {
 
 	const parsed = schema.safeParse(runtime);
 	if (!parsed.success) {
-		const lines = parsed.error.issues.map(
-			(i) => `  - ${i.path.join('.') || '(root)'}: ${i.message}`
-		);
-		throw new Error(`Invalid server environment:\n${lines.join('\n')}`);
+		// THE ONE PLACE A SCHEMA MESSAGE AND A FIELD PATH ARE THE RIGHT ANSWER, and the reason
+		// this is `explainToOperator` rather than the `check()` every other boundary uses. Nobody
+		// using this product ever sees this string: the process does not start. Its reader is
+		// whoever deployed it, and "DATABASE_POOL_MAX: Too big: expected number to be <=200" is
+		// exactly what they need. See the note on that function in $lib/core/validation/zod.ts.
+		throw new Error(`Invalid server environment:\n${explainToOperator(parsed.error)}`);
 	}
 	const e = parsed.data;
 

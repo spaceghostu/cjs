@@ -14,6 +14,7 @@
 	 * A REAL FORM POST, progressively enhanced. Recording money is the last thing in this product
 	 * that should depend on JavaScript having loaded.
 	 */
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import {
 		Button,
@@ -23,14 +24,16 @@
 		DialogFooter,
 		DialogHeader,
 		DialogTitle,
+		Field,
 		Input,
-		Label,
+		MoneyField,
 		Select,
 		SelectContent,
 		SelectItem,
 		SelectTrigger
 	} from '$lib/ui';
 	import { PAYMENT_METHODS, REVERSAL_WINDOW_DAYS, type PaymentMethod } from '$lib/core/invoicing';
+	import { checkAmount } from '$lib/core/validation';
 	import { moneyToDecimalString } from '$lib/core/money';
 	import type { Money } from '$lib/core/money';
 	import type { CalendarDate } from '$lib/core/calendar';
@@ -71,11 +74,29 @@
 		other: 'Something else'
 	};
 
-	// Re-defaulted whenever the dialog opens, so a reversal followed by a re-record does not
+	// Re-defaulted whenever the dialog OPENS, so a reversal followed by a re-record does not
 	// present the stale amount from the previous attempt.
+	//
+	// `outstanding` is read inside `untrack` deliberately: `open` is the only thing that may
+	// re-seed this box. Tracking the amount owed as well would mean that any revalidation
+	// landing while the dialog is up — some other action on the page calling `invalidateAll` —
+	// silently replaces what the person has typed with the figure from the server. That is the
+	// "never clear what they typed" rule losing to a refresh nobody asked for, and it is the
+	// same shape as the guard in `ItemDialog`.
 	$effect(() => {
-		if (open) amount = moneyToDecimalString(outstanding);
+		if (open) amount = untrack(() => moneyToDecimalString(outstanding));
 	});
+
+	/**
+	 * The money core's answer about what is in the box, handed to the field whole.
+	 *
+	 * A courtesy, not the check — `?/recordPayment` parses it again with the same function and
+	 * refuses on its own account. What this buys is that somebody who typed "R1 2OO" with a
+	 * letter O finds out before pressing the button that records money against a client's
+	 * account. An emptied box is left alone: `required` is what has something to say about that,
+	 * and "Enter an amount." under a field the person has just cleared to retype is nagging.
+	 */
+	const check = $derived(amount.trim() === '' ? null : checkAmount(amount));
 </script>
 
 <Dialog bind:open>
@@ -103,69 +124,51 @@
 			{/if}
 
 			<div class="mt-4 flex flex-col gap-4">
-				<div>
-					<Label for="payment-amount">Amount</Label>
-					<div class="mt-1.5">
-						<!--
-							`inputmode="decimal"` so a phone offers the right keypad, and the value is
-							parsed by `parseMoneyInput` on the server — never by `parseFloat`, which is
-							import-banned for exactly this field.
-						-->
-						<Input
-							id="payment-amount"
-							name="amount"
-							bind:value={amount}
-							inputmode="decimal"
-							autocomplete="off"
-							required
-						/>
-					</div>
-					<p class="mt-1.5 text-helper text-ink-muted">
-						Defaults to the full balance. Change it if they paid part of it.
-					</p>
-				</div>
+				<MoneyField
+					label="Amount"
+					id="payment-amount"
+					name="amount"
+					bind:value={amount}
+					result={check}
+					required
+					helper="Defaults to the full balance. Change it if they paid part of it."
+				/>
 
-				<div>
-					<Label for="payment-date">Date received</Label>
-					<div class="mt-1.5">
+				<Field label="Date received" id="payment-date">
+					{#snippet control(field)}
 						<!-- The day the MONEY moved, not the day it is being typed in. -->
-						<Input
-							id="payment-date"
-							name="receivedOn"
-							type="date"
-							bind:value={receivedOn}
-							required
-						/>
-					</div>
-				</div>
+						<Input {...field} name="receivedOn" type="date" bind:value={receivedOn} required />
+					{/snippet}
+				</Field>
 
-				<div>
-					<Label for="payment-method">How</Label>
-					<div class="mt-1.5">
+				<Field label="How" id="payment-method">
+					{#snippet control(field)}
 						<Select type="single" bind:value={method} name="method">
-							<SelectTrigger id="payment-method">{LABELS[method]}</SelectTrigger>
+							<SelectTrigger {...field}>{LABELS[method]}</SelectTrigger>
 							<SelectContent>
 								{#each PAYMENT_METHODS as option (option)}
 									<SelectItem value={option}>{LABELS[option]}</SelectItem>
 								{/each}
 							</SelectContent>
 						</Select>
-					</div>
-				</div>
+					{/snippet}
+				</Field>
 
-				<div>
-					<Label for="payment-reference">Reference</Label>
-					<div class="mt-1.5">
+				<Field
+					label="Reference"
+					id="payment-reference"
+					helper="Optional. Useful when you reconcile."
+				>
+					{#snippet control(field)}
 						<Input
-							id="payment-reference"
+							{...field}
 							name="reference"
 							bind:value={reference}
 							autocomplete="off"
 							placeholder="What is on the statement"
 						/>
-					</div>
-					<p class="mt-1.5 text-helper text-ink-muted">Optional. Useful when you reconcile.</p>
-				</div>
+					{/snippet}
+				</Field>
 			</div>
 
 			<DialogFooter class="mt-5">

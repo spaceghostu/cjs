@@ -13,7 +13,7 @@
 	 * make the address book slowly wrong, and silent write-back would let a one-off correction
 	 * on one document rewrite every other one.
 	 */
-	import { Input, Label, Select, SelectContent, SelectItem, SelectTrigger } from '$lib/ui';
+	import { Field, Input, Select, SelectContent, SelectItem, SelectTrigger } from '$lib/ui';
 	import type { EditorState } from '$lib/core/quoting';
 
 	let {
@@ -36,9 +36,8 @@
 	<h2 class="text-eyebrow text-ink-muted uppercase">Who it's for</h2>
 
 	<div class="mt-3 grid gap-4 sm:grid-cols-2">
-		<div>
-			<Label for="quote-client">Client</Label>
-			<div class="mt-1.5">
+		<Field label="Client" id="quote-client">
+			{#snippet control(field)}
 				<Select
 					type="single"
 					value={state.customerId ?? ''}
@@ -48,7 +47,7 @@
 						onclientchange(value);
 					}}
 				>
-					<SelectTrigger id="quote-client" class="w-full">
+					<SelectTrigger {...field} class="w-full">
 						{selectedName || 'Choose a client'}
 					</SelectTrigger>
 					<SelectContent>
@@ -57,12 +56,11 @@
 						{/each}
 					</SelectContent>
 				</Select>
-			</div>
-		</div>
+			{/snippet}
+		</Field>
 
-		<div>
-			<Label for="quote-send-to">Send to</Label>
-			<div class="mt-1.5">
+		<Field label="Send to" id="quote-send-to">
+			{#snippet control(field)}
 				<!--
 					`type="email"` for the keyboard and the browser's own check, not as the
 					validation: the address that must be deliverable is checked at send, where
@@ -70,15 +68,15 @@
 					form fighting the person filling it in.
 				-->
 				<Input
-					id="quote-send-to"
+					{...field}
 					type="email"
 					inputmode="email"
 					autocomplete="email"
 					placeholder="name@company.co.za"
 					bind:value={state.sendToEmail}
 				/>
-			</div>
-		</div>
+			{/snippet}
+		</Field>
 	</div>
 
 	<p class="mt-2 text-helper text-ink-muted">
@@ -86,17 +84,15 @@
 	</p>
 
 	<div class="mt-4 grid gap-4 sm:grid-cols-2">
-		<div>
-			<Label for="quote-client-name">Name on the document</Label>
-			<div class="mt-1.5">
-				<Input id="quote-client-name" bind:value={state.name} />
-			</div>
-		</div>
-		<div>
-			<Label for="quote-client-contact">Contact person</Label>
-			<div class="mt-1.5">
-				<Input id="quote-client-contact" bind:value={state.contactPerson} />
-			</div>
-		</div>
+		<Field label="Name on the document" id="quote-client-name">
+			{#snippet control(field)}
+				<Input {...field} bind:value={state.name} />
+			{/snippet}
+		</Field>
+		<Field label="Contact person" id="quote-client-contact">
+			{#snippet control(field)}
+				<Input {...field} bind:value={state.contactPerson} />
+			{/snippet}
+		</Field>
 	</div>
 </section>

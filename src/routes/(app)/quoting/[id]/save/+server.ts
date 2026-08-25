@@ -31,7 +31,7 @@ export const POST: RequestHandler = async (event) => {
 
 	return withModule(event, 'quoting', 'write', async (ctx) => {
 		try {
-			const savedAt = await saveDraft(ctx.tx, ctx.business.id, event.params.id, parsed.patch);
+			const savedAt = await saveDraft(ctx.tx, ctx.business.id, event.params.id, parsed.value);
 			return json({ savedAt: savedAt.toISOString() } satisfies SaveResult);
 		} catch (cause) {
 			// A quote that has been sent is frozen — the client has a PDF, and editing the

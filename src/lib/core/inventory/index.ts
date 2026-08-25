@@ -53,13 +53,42 @@ export {
 export type { InventoryFilter, InventorySort, SortDirection } from './filter';
 
 export {
+	countAppliedCopy,
+	countProgressLine,
+	countReassurance,
+	countReviewCopy,
+	countStartedLine,
+	countTitle,
 	emptyCopy,
+	homeStandingCopy,
+	matchedRowLabel,
 	movementReasonCopy,
+	reviewChangesLabel,
 	standingSentence,
 	stockCopy,
-	summarySentence
+	summarySentence,
+	uncostedNote
 } from './copy';
 
-export type { StockCopy, SummaryFacts, Tone } from './copy';
+export type {
+	CountReassurance,
+	CountReviewCopy,
+	StandingCopy,
+	StockCopy,
+	SummaryFacts,
+	Tone
+} from './copy';
 
-export type { ItemPatch, MovementPatch } from './wire';
+export {
+	COUNTED_FIELD,
+	COUNT_STEPS,
+	checkCounted,
+	countPeriodFor,
+	liveLine,
+	stepOfStatus,
+	triageCount
+} from './counting';
+
+export type { CountLineState, CountSheetRow, CountStep, CountTriage, TriagedRow } from './counting';
+
+export type { CountLinePatch, CountPatch, CountSaveResult, ItemPatch, MovementPatch } from './wire';
