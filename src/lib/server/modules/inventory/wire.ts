@@ -23,14 +23,20 @@
  * from, so the rendering layer can put a message under the input rather than at the top of the
  * dialog.
  */
+import { z } from 'zod';
 import {
 	about,
+	check,
 	checkQuantity,
 	checkUnitPrice,
 	invalid,
 	problem,
-	type Problem
+	valid,
+	type Checked,
+	type Problem,
+	type Vocabulary
 } from '$lib/core/validation';
+import { COUNTED_FIELD, checkCounted } from '$lib/core/inventory';
 import type { ItemInput } from './effects';
 
 export type ParsedItem =
@@ -118,4 +124,89 @@ export function parseItemForm(form: FormData): ParsedItem {
 		},
 		openingQtyE6: opening.value
 	};
+}
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * THE COUNT SHEET'S BOUNDARY
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * A batch of counted lines, arriving from the autosave every time somebody pauses typing.
+ *
+ * WHAT ARRIVES IS TEXT, AND THAT IS DELIBERATE. The browser sends "14", or "1 200,5", or the
+ * empty string — never an integer. Quoting sends `qtyE6` because its editor has already parsed
+ * for pricing and the preview would be a lie otherwise; a count sheet has no such need, so the
+ * one parser in this product gets to be the only one that ever sees these strings. A component
+ * that turned "1 200,5" into 1_200_500_000 on the way out would be a second parser, in the one
+ * layer that has no tests against a real database.
+ *
+ * `null` IS NOT `"0"`, ALL THE WAY DOWN. A blank box means "I have not looked at this one yet"
+ * and `saveCountLine` stores it as SQL NULL; a typed zero means "the shelf is empty" and is a
+ * finding worth money. Three layers say so — this one, the storage CHECK, and the dashed border
+ * on the screen — because a promise held in only one place is held until somebody writes a
+ * second caller.
+ *
+ * EVERY PROBLEM IS ANCHORED TO THE LINE'S OWN ID, not to `lines.3.counted`. The variance table
+ * is a grid, not a stack of labelled fields, so its message is found by the row rather than by
+ * the cell — see the header on `FieldError.svelte`, which is the primitive that renders it.
+ */
+
+/** Well past any real count sheet, and the same ceiling `MAX_PAGE_SIZE` puts on reading one. */
+const MAX_COUNT_LINES = 500;
+
+const countPatchSchema = z.object({
+	lines: z
+		.array(
+			z.object({
+				id: z.uuid(),
+				// Bounded: a quantity is a quantity. Nothing here needs a kilobyte.
+				counted: z.string().max(64).nullable()
+			})
+		)
+		.max(MAX_COUNT_LINES)
+});
+
+/** What the count endpoint hands `saveCountLine`, once nothing is a claim any more. */
+export type CountLineInput = {
+	readonly id: string;
+	/** Millionths of a unit, or null to un-count the line. */
+	readonly countedQtyE6: number | null;
+};
+
+export type ParsedCount = Checked<{ readonly lines: readonly CountLineInput[] }>;
+
+/**
+ * The words this boundary lends the standard.
+ *
+ * Only one field is ever typed here, so there is only one subject to name — and it is named,
+ * because "Enter a number" on its own does not say a number of what. The same subject
+ * `checkCounted` uses, from the same constant, so a shape complaint and a value complaint
+ * introduce themselves identically.
+ */
+const COUNT_WORDS: Vocabulary = { fields: { counted: COUNTED_FIELD } };
+
+export function parseCountPatch(input: unknown): ParsedCount {
+	const shape = check(countPatchSchema, input, COUNT_WORDS);
+	if (!shape.ok) return shape;
+
+	const lines: CountLineInput[] = [];
+
+	for (const line of shape.value.lines) {
+		// `checkCounted` is the SAME function the count sheet asked before it queued this line.
+		// One place decides what a count box may hold, so the sentence a person reads while
+		// typing and the sentence they get back from the server cannot be two different
+		// sentences. `null` is a blank box: a real, chosen state, and the only way back from a
+		// number typed into the wrong row.
+		const checked = checkCounted(line.counted ?? '', line.id);
+
+		if (checked === null) {
+			lines.push({ id: line.id, countedQtyE6: null });
+			continue;
+		}
+		if (!checked.ok) return checked;
+
+		lines.push({ id: line.id, countedQtyE6: checked.value.e6 });
+	}
+
+	return valid({ lines });
 }

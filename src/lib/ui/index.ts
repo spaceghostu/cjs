@@ -74,7 +74,25 @@ export {
 export { Toaster } from '$lib/components/ui/sonner';
 
 /** Money and quantity rendering from T03. Screens never format an amount by hand. */
-export { Amount, Blank, Qty, StatDelta, UnitPrice } from '$lib/components/money';
+export {
+	Amount,
+	Blank,
+	Qty,
+	StatDelta,
+	UnitPrice,
+	qtyText,
+	signedQtyText
+} from '$lib/components/money';
+
+/**
+ * MULTI-STEP FLOWS. `Stepper` is here deliberately, and not only because a screen needs it.
+ *
+ * T24 calls the stock count "the pattern-setter" for every flow after it — pay runs, VAT returns,
+ * bank reconciliation. A component the next module is expected to reuse has to be reachable
+ * through the door every module already comes to, or the next author writes their own and the
+ * platform grows a second idea of what progress looks like.
+ */
+export { Stepper } from '$lib/components/flow';
 
 /**
  * Fields, and what a field says when it cannot accept what it was given.

@@ -714,7 +714,7 @@ describe('what Home is told about stock', () => {
 				id: countId,
 				title: 'Stock count · July',
 				context: '2 of 4 counted',
-				href: `/inventory/count/${countId}`
+				href: `/inventory/counts/${countId}`
 			});
 		});
 

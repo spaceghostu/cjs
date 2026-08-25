@@ -15,6 +15,7 @@ export {
 	amountClass,
 	amountText,
 	qtyText,
+	signedQtyText,
 	unitPriceText,
 	type AmountOptions,
 	type AmountSize,

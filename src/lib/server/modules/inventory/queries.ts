@@ -531,6 +531,10 @@ export type StockCountRow = {
 	readonly status: StockCountStatus;
 	readonly periodStart: CalendarDate;
 	readonly periodEnd: CalendarDate;
+	/** "Started Tuesday". The count screen's header says how long this has been open. */
+	readonly startedAt: Date;
+	/** Null until step 4. The only record of when every quantity in the business changed. */
+	readonly appliedAt: Date | null;
 };
 
 export async function loadStockCount(tx: Tx, countId: string): Promise<StockCountRow | null> {
@@ -540,7 +544,9 @@ export async function loadStockCount(tx: Tx, countId: string): Promise<StockCoun
 			numberFormatted: stockCount.numberFormatted,
 			status: stockCount.status,
 			periodStart: stockCount.periodStart,
-			periodEnd: stockCount.periodEnd
+			periodEnd: stockCount.periodEnd,
+			startedAt: stockCount.startedAt,
+			appliedAt: stockCount.appliedAt
 		})
 		.from(stockCount)
 		.where(eq(stockCount.id, countId));
@@ -609,6 +615,8 @@ export type StockCountLineRow = {
 	readonly id: string;
 	readonly itemId: string;
 	readonly itemName: string;
+	/** "board", "litre" — the business's own word. The count sheet labels every box with it. */
+	readonly unit: string;
 	readonly locationId: string;
 	readonly locationName: string;
 	readonly expected: Quantity;
@@ -623,6 +631,7 @@ export async function loadStockCountLines(tx: Tx, countId: string): Promise<Stoc
 			id: stockCountLine.id,
 			itemId: stockCountLine.itemId,
 			itemName: item.name,
+			unit: item.unit,
 			locationId: stockCountLine.locationId,
 			locationName: location.name,
 			expectedQtyE6: stockCountLine.expectedQtyE6,
@@ -642,6 +651,7 @@ export async function loadStockCountLines(tx: Tx, countId: string): Promise<Stoc
 		id: row.id,
 		itemId: row.itemId,
 		itemName: row.itemName,
+		unit: row.unit,
 		locationId: row.locationId,
 		locationName: row.locationName,
 		expected: toQuantity(row.expectedQtyE6),

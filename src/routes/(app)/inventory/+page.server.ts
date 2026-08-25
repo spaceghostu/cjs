@@ -24,6 +24,7 @@ import { carryoverSummary, loadCarryover } from '$lib/server/core/modules/carryo
 import { todayIn } from '$lib/core/calendar';
 import { zero } from '$lib/core/money';
 import {
+	countPeriodFor,
 	defaultDirection,
 	isInventoryFilter,
 	isInventorySort,
@@ -39,6 +40,7 @@ import {
 	listLocations,
 	summarise
 } from '$lib/server/modules/inventory/queries';
+import { resumeOrPrepareCount } from '$lib/server/modules/inventory/counts';
 import { CannotDoThat, createItem } from '$lib/server/modules/inventory/effects';
 import { parseItemForm } from '$lib/server/modules/inventory/wire';
 import type { Actions, PageServerLoad } from './$types';
@@ -174,5 +176,48 @@ export const actions: Actions = {
 		}
 
 		redirect(303, `/inventory/${id}`);
+	},
+
+	/**
+	 * START A STOCK COUNT — or go back to the one already open.
+	 *
+	 * THE ENTRY POINT IS THIS AUTHOR'S JUDGEMENT, NOT T24'S. The ticket specifies the four-step
+	 * screen and says nothing about how a person reaches it, so this is the smallest thing that
+	 * makes the flow reachable: one action on the screen where somebody is already looking at
+	 * their stock. If the product later wants counts scheduled, or started from Home, this is the
+	 * function that grows — nothing else in the flow knows how it was entered.
+	 *
+	 * RESUME BEFORE PREPARE, and that ordering is the whole of it — but the ordering is NOT the
+	 * whole of the safety, so it does not live here. Every `prepareCount` burns an `SC-` number
+	 * and snapshots forty-eight lines; a second click that made a second count would leave the
+	 * first one orphaned behind Home's resume card, which shows exactly one. Two clicks half a
+	 * second apart are two transactions, and a check-then-act spread across two of them is a
+	 * race whatever order it is written in. `resumeOrPrepareCount` takes an advisory lock on the
+	 * business before it looks, so the second click waits and then finds the first click's count
+	 * — see the header on it, which is where that argument belongs, beside the only file that
+	 * writes the table.
+	 *
+	 * The period is the calendar month somebody is standing in — see `countPeriodFor`, which
+	 * explains why it is this month rather than the last complete one.
+	 */
+	count: async (event) => {
+		let id: string;
+		try {
+			id = await withModule(event, 'inventory', 'write', (ctx) =>
+				resumeOrPrepareCount(
+					ctx.tx,
+					ctx.business.id,
+					ctx.userId,
+					countPeriodFor(todayIn(new Date()))
+				)
+			);
+		} catch (cause) {
+			if (cause instanceof CannotDoThat) return fail(422, { message: cause.message });
+			return fail(500, {
+				message: 'We could not start a stock count just now. Nothing was changed — try again.'
+			});
+		}
+
+		redirect(303, `/inventory/counts/${id}`);
 	}
 };

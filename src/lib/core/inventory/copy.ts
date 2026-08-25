@@ -157,6 +157,206 @@ export function countProgressLine(counted: number, total: number): string {
 	return `${counted} of ${total} counted`;
 }
 
+/** What the reassurance line above the variance table says, in its two halves. */
+export type CountReassurance = {
+	/** The settled half. "42 of 48 items match what we expected." */
+	readonly matched: string;
+	/** The half that sends somebody somewhere. Null when there is nowhere to send them. */
+	readonly differing: string | null;
+	/** Whether the tick is earned. Nothing counted yet is not reassurance. */
+	readonly settled: boolean;
+};
+
+/**
+ * THE LINE THAT DOES THE TRIAGE OUT LOUD.
+ *
+ * T24's own words: "42 of 48 items match what we expected." and "6 are different — they're at
+ * the top of the list." Two statements rather than one, and the split is the whole point — the
+ * first is reassurance, the second is a direction. A single sentence would have to choose which
+ * of the two it was, and the design refuses to.
+ *
+ * THE SECOND HALF IS A PROMISE ABOUT THE TABLE UNDERNEATH IT, so it is generated from the same
+ * number the table is ordered by (`triageCount().differing.length`) and not from a second count
+ * of anything. A line claiming six are at the top of a list that put five there would be the
+ * interface lying about its own layout.
+ *
+ * THE SHAPES ARE NOT ONE SENTENCE WITH NUMBERS IN IT. A count nobody has started is a different
+ * statement, not "0 of 48 items match what we expected" — which reads as a catastrophe rather
+ * than as an untouched sheet. Same rule as `summarySentence`: the empty case gets its own words.
+ */
+export function countReassurance(facts: {
+	matched: number;
+	differing: number;
+	counted: number;
+	total: number;
+}): CountReassurance {
+	const { matched, differing, counted, total } = facts;
+
+	if (total === 0) {
+		return { matched: 'There is nothing to count.', differing: null, settled: false };
+	}
+
+	const items = `${total} ${total === 1 ? 'item' : 'items'}`;
+
+	if (counted === 0) {
+		return {
+			matched: `Nothing counted yet — ${items} to look at.`,
+			differing: null,
+			settled: false
+		};
+	}
+
+	const matchedText =
+		matched === 0
+			? 'Nothing counted so far matches what we expected.'
+			: matched === total
+				? // "All 1 item match" is exactly the seam that makes a product feel unfinished.
+					total === 1
+					? 'The one item matches what we expected.'
+					: `All ${items} match what we expected.`
+				: `${matched} of ${items} match what we expected.`;
+
+	return {
+		matched: matchedText,
+		differing:
+			differing === 0
+				? null
+				: differing === 1
+					? "One is different — it's at the top of the list."
+					: `${differing} are different — they're at the top of the list.`,
+		// The tick belongs to the matches. It is earned the moment anything matched, because the
+		// sentence beside it is then good news about real work — and it is withheld while every
+		// counted line is a variance, where a green tick would be the interface congratulating
+		// somebody on a problem.
+		settled: matched > 0
+	};
+}
+
+/**
+ * "Started Tuesday" — the right-hand half of the count header, beside "saved automatically".
+ *
+ * A WEEKDAY WHILE ONE IS STILL MEANINGFUL, AND A DATE AFTER THAT. "Tuesday" is how somebody
+ * thinks about work they left three days ago; "Tuesday" for something from five weeks back is a
+ * riddle. The changeover is at a week, which is the point past which a weekday stops naming a
+ * unique day in anybody's memory.
+ *
+ * Takes epoch milliseconds rather than `Date`s, so nothing upstream has to hold a mutable clock
+ * — the same reason `clockTime` in the quote editor's state does. The two `Date`s built inside
+ * are transient: nothing keeps them and nothing mutates them.
+ */
+export function countStartedLine(startedAtMs: number, nowMs: number, locale: string): string {
+	const started = new Date(startedAtMs);
+	const now = new Date(nowMs);
+
+	const day = 24 * 60 * 60 * 1000;
+	const startedDay = Date.UTC(started.getFullYear(), started.getMonth(), started.getDate());
+	const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+	const daysAgo = (today - startedDay) / day;
+
+	if (daysAgo <= 0) return 'Started today';
+	if (daysAgo === 1) return 'Started yesterday';
+	if (daysAgo < 7) return `Started ${started.toLocaleDateString(locale, { weekday: 'long' })}`;
+
+	return `Started ${started.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}`;
+}
+
+/**
+ * "3 of these have no cost recorded, so they are not in that figure."
+ *
+ * `netValueEffect` returns `uncosted` rather than swallowing it, and its own header says why: a
+ * line whose item has no recorded cost contributes nothing to the net, and a total that quietly
+ * omitted it while presenting itself as complete would be the interface understating a loss.
+ * This is the sentence that keeps the figure honest — and it is null, not an empty string, when
+ * there is nothing to disclose, so a screen cannot render an empty caveat.
+ */
+export function uncostedNote(uncosted: number): string | null {
+	if (uncosted <= 0) return null;
+	if (uncosted === 1) return 'One of these has no cost recorded, so it is not in that figure.';
+	return `${uncosted} of these have no cost recorded, so they are not in that figure.`;
+}
+
+/** "42 items matched exactly" — the row the sheet collapses its good news into. */
+export function matchedRowLabel(matched: number): string {
+	return `${matched} ${matched === 1 ? 'item' : 'items'} matched exactly`;
+}
+
+/** What step 3 says above the list of everything that is about to happen. */
+export type CountReviewCopy = { readonly headline: string; readonly explanation: string };
+
+/**
+ * THE LAST POINT OF RETURN, IN WORDS.
+ *
+ * Step 3 is a GATE, not a summary, so it has to state three things and not two: what will change,
+ * that nothing else will, and what happens to the shelves nobody reached. The third is the one an
+ * interface forgets, and forgetting it is how somebody applies a count believing an unvisited
+ * rack has been written off.
+ *
+ * "NOTHING WILL CHANGE" IS A REAL AND GOOD ANSWER. A count where everything matched happened, is
+ * recorded, and moves nothing — `applyCount` says so in its own header — and the review step
+ * should say it plainly rather than showing an empty table.
+ */
+export function countReviewCopy(changes: number, uncounted: number): CountReviewCopy {
+	const headline =
+		changes === 0
+			? 'Nothing will change.'
+			: `${changes} ${changes === 1 ? 'line' : 'lines'} will change your stock.`;
+
+	const explanation =
+		changes === 0
+			? 'Everything you counted matched what we expected, so applying this count records no movements.'
+			: 'Applying this count records one movement per line below. Nothing else in your stock moves.';
+
+	const notCounted =
+		uncounted === 0
+			? ''
+			: uncounted === 1
+				? ' One line was never counted, and nothing will be recorded against it.'
+				: ` ${uncounted} lines were never counted, and nothing will be recorded against them.`;
+
+	return { headline, explanation: explanation + notCounted };
+}
+
+/**
+ * STEP 4 — WHAT ACTUALLY HAPPENED.
+ *
+ * A confirmation that says what was DONE, not that something was done. "Saved" tells a person
+ * nothing they could act on; "5 movements recorded — one for each line that differed, and each
+ * one shows in that item's history" tells them where to go and look, which is the difference
+ * between being told and being able to check.
+ *
+ * The all-matched case is not an anticlimax to be dressed up. A count where everything agreed is
+ * a good outcome and worth saying out loud: it happened, it is recorded, and it changed nothing.
+ */
+export function countAppliedCopy(movements: number): CountReviewCopy {
+	if (movements === 0) {
+		return {
+			headline: 'Your stock is up to date.',
+			explanation:
+				'Everything you counted matched, so nothing moved. The count is recorded, and each item now shows when it was last checked.'
+		};
+	}
+
+	return {
+		headline: 'Your stock is up to date.',
+		explanation: `${movements} ${movements === 1 ? 'movement' : 'movements'} recorded — one for each line that differed. Every one of them shows in that item's history, with this count as the reason.`
+	};
+}
+
+/**
+ * "Review 5 changes" — the primary action, which NAMES THE COUNT rather than saying "Continue".
+ *
+ * T24 is specific about this, and it is the difference between a button that advances a wizard
+ * and a button that tells you what you are about to be shown. A person who reads "Review 5
+ * changes" already knows the size of the decision waiting on the next step.
+ *
+ * A count with no changes still goes through step 3, because step 3 is the GATE and not a
+ * summary — but it cannot be labelled with a number it does not have.
+ */
+export function reviewChangesLabel(changes: number): string {
+	if (changes === 0) return 'Review this count';
+	return `Review ${changes} ${changes === 1 ? 'change' : 'changes'}`;
+}
+
 /**
  * "Stock count · July" — what to call a count on a card.
  *

@@ -6,6 +6,7 @@ import {
 	amountClass,
 	amountText,
 	qtyText,
+	signedQtyText,
 	unitPriceText,
 	type AmountSize,
 	type AmountTone
@@ -139,6 +140,23 @@ describe('qtyText', () => {
 	it('keeps whole numbers whole', () => {
 		expect(qtyText(quantity(3_000_000))).toBe('3');
 		expect(qtyText(quantity(2_500_000))).toBe('2,5');
+	});
+});
+
+describe('signedQtyText', () => {
+	/** The stock count's difference column. T24's own line: expected 18, counted 14, "−4". */
+	it('signs a variance with a real minus, not a hyphen', () => {
+		expect(signedQtyText(quantity(-4_000_000))).toBe(`${MINUS}4`);
+		expect(signedQtyText(quantity(3_000_000))).toBe(`${PLUS}3`);
+	});
+
+	/** A difference of nothing is neither up nor down, so it wears no sign. */
+	it('leaves zero unsigned', () => {
+		expect(signedQtyText(quantity(0))).toBe('0');
+	});
+
+	it('keeps the fraction a fractional difference actually has', () => {
+		expect(signedQtyText(quantity(-2_500_000))).toBe(`${MINUS}2,5`);
 	});
 });
 

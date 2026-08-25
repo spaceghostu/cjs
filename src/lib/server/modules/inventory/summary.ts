@@ -87,9 +87,7 @@ async function countInProgress(input: SummaryInput): Promise<readonly ResumeCard
 			// draft quote's "Nothing on it yet".
 			context:
 				count.total === 0 ? 'Nothing to count yet' : countProgressLine(count.counted, count.total),
-			// SPA-7 owns this route. Until it lands nothing in the interface creates a count, so
-			// this card cannot appear outside a seeded database.
-			href: `/inventory/count/${count.id}`
+			href: `/inventory/counts/${count.id}`
 		}
 	];
 }
