@@ -1,4 +1,4 @@
-import type { Handle, ServerInit } from '@sveltejs/kit';
+import type { Handle, HandleServerError, ServerInit } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { building } from '$app/environment';
@@ -136,6 +136,44 @@ const handleGuard: Handle = async ({ event, resolve }) => {
 	if (needsBusiness) redirect(303, '/onboarding');
 
 	return resolve(event);
+};
+
+/**
+ * THE THROW NOBODY ANTICIPATED.
+ *
+ * Every deliberate refusal in this product goes through `error()` with an `App.Error` written
+ * for the person reading it. This hook is for the other kind: a driver that went away
+ * mid-transaction, a null nobody guarded, a bug. Without it SvelteKit fills `App.Error` with its
+ * own default — the two words "Internal Error" — and a developer's sentence lands on a user's
+ * screen, which is the exact prohibition `$lib/core/validation` states as a rule: if a sentence
+ * was written for a developer, a developer is who gets to read it.
+ *
+ * So the cause is LOGGED and the person is TOLD SOMETHING ELSE. The two halves are joined by
+ * `locals.requestId`, which exists for precisely this — "correlates a request's log lines and
+ * its audit rows" — so the sentence somebody read out over the phone can be found in the log
+ * without them having to describe it. The id is read defensively because a failure early enough
+ * in the pipeline can precede the hook that sets it.
+ *
+ * NEVER RETURN THE CAUSE'S OWN MESSAGE. A Postgres constraint name, a stack frame or a zod issue
+ * would be both frightening and useless to the person it reached, and on a shared error surface
+ * it is also how internals leak.
+ *
+ * The code is `unexpected` rather than `no_request_context`: that one names ONE specific `ctx`
+ * invariant, and overloading it to also mean "anything at all" would make the logs unreadable.
+ * The sentence is deliberately the same one, because it is the right sentence for both.
+ */
+export const handleError: HandleServerError = ({ error, event, status, message }) => {
+	console.error(
+		`[${event.locals?.requestId ?? 'no-request-id'}] ${status} ${message} at ${event.url.pathname}`,
+		error
+	);
+
+	return {
+		code: 'unexpected',
+		message: 'Something went wrong on our side. Nothing you did caused this.',
+		nextHref: '/',
+		nextLabel: 'Back to your dashboard'
+	};
 };
 
 export const handle: Handle = sequence(handleIdentity, handleBusiness, handleGuard);

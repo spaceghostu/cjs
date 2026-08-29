@@ -21,7 +21,7 @@
 	import ClipboardList from '@lucide/svelte/icons/clipboard-list';
 	import Package from '@lucide/svelte/icons/package';
 	import Plus from '@lucide/svelte/icons/plus';
-	import { Button } from '$lib/ui';
+	import { Button, EmptyState, NoMatches } from '$lib/ui';
 	import { PrimaryAction } from '$lib/components/shell';
 	import {
 		emptyCopy,
@@ -82,6 +82,13 @@
 	const moduleIsEmpty = $derived(counts.all === 0 && counts.archived === 0);
 </script>
 
+{#snippet addAnItem()}
+	<Button onclick={oncreate}>
+		<Plus class="size-4" aria-hidden="true" />
+		Add an item
+	</Button>
+{/snippet}
+
 <!-- Page and filter links carry a query string, not a route id — see the note in `ItemTable`. -->
 <!-- eslint-disable svelte/no-navigation-without-resolve -->
 
@@ -139,29 +146,22 @@
 
 	{#if moduleIsEmpty}
 		<!--
-			THE EMPTY MODULE. A panel, not a sentence — because the way out of it is a button, and
-			this is the one state where the interface has something to offer rather than something to
-			report.
+			THE EMPTY MODULE, and THE FILTER THAT MATCHED NOTHING, drawn by the two shared
+			primitives rather than by hand. The reasoning that separates them is unchanged and
+			still at the top of this file; SPA-13 moved only the drawing, and carried the argument
+			with it into `$lib/components/state/index.ts`, where the next module can find it. The
+			`mt-8` is the margin this screen always had — the primitives are margin-free.
 		-->
-		<div
-			class="mt-8 flex flex-col items-start gap-2.5 rounded-[10px] border border-line-default
-				bg-surface-card p-7"
-		>
-			<Package size={22} strokeWidth={1.75} class="text-inventory" aria-hidden="true" />
-			<h2 class="text-[16px] leading-snug text-ink">Nothing in your stock yet</h2>
-			<p class="max-w-[380px] text-[13px] leading-relaxed text-ink-secondary">
-				{emptyCopy('all')}
-			</p>
-			{#if !readOnly}
-				<Button class="mt-1.5" onclick={oncreate}>
-					<Plus class="size-4" aria-hidden="true" />
-					Add an item
-				</Button>
-			{/if}
-		</div>
+		<EmptyState
+			class="mt-8"
+			icon={Package}
+			accentClass="text-inventory"
+			heading="Nothing in your stock yet"
+			body={emptyCopy('all')}
+			action={readOnly ? undefined : addAnItem}
+		/>
 	{:else if items.length === 0}
-		<!-- A FILTER THAT MATCHED NOTHING. One line, no panel, no button. -->
-		<p class="mt-8 text-ui text-ink-secondary">{emptyCopy(filter)}</p>
+		<NoMatches class="mt-8" message={emptyCopy(filter)} />
 	{:else}
 		<div class="hidden lg:block">
 			<ItemTable {items} {sort} {direction} {sortHref} />

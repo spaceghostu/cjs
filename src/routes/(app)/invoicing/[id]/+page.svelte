@@ -134,6 +134,7 @@
 			{saving}
 			{issuing}
 			message={saveError ?? message}
+			onsaveretry={saveError ? save : undefined}
 			onsave={save}
 			onissue={issue}
 			ondiscard={() => discardForm?.requestSubmit()}

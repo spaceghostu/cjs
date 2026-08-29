@@ -30,6 +30,7 @@ import {
 	formatWeekdayDate,
 	type CalendarDate
 } from '$lib/core/calendar';
+import type { InvoiceFilter } from './filter';
 import type { InvoiceStatus } from './types';
 
 /**
@@ -250,4 +251,25 @@ export function openCountPhrase(count: number): string {
 	if (count <= 1) return 'Once';
 	if (count === 2) return 'Twice';
 	return `${capitalise(countWord(count))} times`;
+}
+
+/**
+ * THE TWO EMPTY STATES, WHICH ARE NOT THE SAME STATE.
+ *
+ * The same distinction inventory's `emptyCopy` draws, and it belongs here for the same reason:
+ * SPA-13 shares the SURFACE across the modules and leaves each module's WORDS with the module.
+ * A business with no invoices at all needs a way out of that — start one, and here is what will
+ * happen when you do. A business with forty invoices and an "Overdue" tab showing none needs
+ * nothing offered at all; it has just been told good news, and a "New invoice" button under it
+ * would be the interface misreading that as a lack.
+ *
+ * The screen branches on the COUNTS to tell them apart, never on the visible rows and never on
+ * which tab is showing — `InvoiceList` did the latter until SPA-13, which got it wrong in both
+ * directions at once.
+ */
+export function emptyCopy(filter: InvoiceFilter): string {
+	if (filter === 'all') {
+		return 'Nothing invoiced yet. Start one and it will save as you go — you can close it and come back.';
+	}
+	return 'Nothing here. That is usually good news.';
 }

@@ -113,6 +113,33 @@ export {
 	type FieldResult
 } from '$lib/components/form';
 
+/**
+ * What a screen says when it has nothing to show, or when something did not work.
+ *
+ * The standard these four implement is written out in `$lib/components/state/index.ts`, and it
+ * is the deliverable rather than the components: an empty state is not an error and never wears
+ * error colour; no-records and no-matches are different states and the branch is on counts;
+ * a save failure keeps the work and offers a retry; not entitled is not an error; and not found
+ * has exactly one sentence, from `notFound()` in `$lib/core/refusals`, because that one is a
+ * tenancy boundary rather than a copy preference.
+ *
+ * Ours rather than vendored, and for the same reason `Field` is: `eslint.config.js` globally
+ * ignores `src/lib/components/ui/**` — "Not ours to lint or to hold to our zones" — so a
+ * hand-written primitive placed there would escape every architecture zone in this repo,
+ * including the one that would notice `Refusal` growing a `role="alert"`. Reachability is NOT
+ * the reason: this barrel sits outside zone 2 and re-exports from the vendored directory a
+ * dozen times above, and `$lib/components/state/*` is directly importable from a route today.
+ * The single door is the seam that makes the placement work — a screen asks `$lib/ui` for a
+ * `Refusal` and never learns where it lives.
+ *
+ * The shadcn registry's `empty` and `alert` were fetched, read and rejected before these were
+ * written — on geometry that contradicts the house panel on every axis, on `AlertTitle`'s
+ * `line-clamp-1` truncating the long sentences this product writes, and on `Alert` hard-coding
+ * the assertive `role="alert"` this layer forbids. `$lib/components/state/index.ts` records the
+ * comparison in full, so nobody adds them later thinking the omission was an oversight.
+ */
+export { EmptyState, ErrorState, NoMatches, Refusal } from '$lib/components/state';
+
 /** The per-tenant brand hook and palette from T01. */
 export {
 	BRAND_OPTIONS,

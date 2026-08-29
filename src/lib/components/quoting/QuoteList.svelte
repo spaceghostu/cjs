@@ -11,7 +11,8 @@
 	 * asked for. A row per quote, the status, who it is for, what it came to, and when it last
 	 * moved.
 	 */
-	import { Amount, Badge, Blank, Button } from '$lib/ui';
+	import FileText from '@lucide/svelte/icons/file-text';
+	import { Amount, Badge, Blank, Button, EmptyState } from '$lib/ui';
 	import { formatShortDate, type QuoteStatus } from '$lib/core/quoting';
 	import type { Money } from '$lib/core/money';
 
@@ -65,6 +66,12 @@
 	};
 </script>
 
+{#snippet newQuote()}
+	<Button onclick={oncreate} disabled={creating}>
+		{creating ? 'Starting…' : 'New quote'}
+	</Button>
+{/snippet}
+
 <!--
 	The row href carries a quote id, so there is no literal route id for `resolve()` to
 	type-check against. Same situation as the resume cards on Home, and disabled for the same
@@ -95,10 +102,20 @@
 		you reach them from is not, so this is deliberately plain.
 	</p>
 
+	<!--
+		This screen has no filter tabs, so it has exactly one empty state and no `NoMatches`:
+		`quotes.length === 0` IS "you have never quoted anything" here, and there is no tab that
+		could narrow it to nothing. The `mt-8` is the margin the paragraph carried before.
+	-->
 	{#if quotes.length === 0}
-		<p class="mt-8 text-ui text-ink-secondary">
-			Nothing quoted yet. Start one and it will save as you go — you can close it and come back.
-		</p>
+		<EmptyState
+			class="mt-8"
+			icon={FileText}
+			accentClass="text-quoting"
+			heading="Nothing quoted yet"
+			body="Start one and it will save as you go — you can close it and come back."
+			action={newQuote}
+		/>
 	{:else}
 		<ul class="mt-6 overflow-hidden rounded-[10px] border border-line-default">
 			{#each quotes as quote (quote.id)}

@@ -17,9 +17,10 @@
 	 */
 	import Receipt from '@lucide/svelte/icons/receipt';
 	import Plus from '@lucide/svelte/icons/plus';
-	import { Button } from '$lib/ui';
+	import { Button, EmptyState, NoMatches } from '$lib/ui';
 	import { PrimaryAction } from '$lib/components/shell';
 	import {
+		emptyCopy,
 		summarySentence,
 		type InvoiceFilter,
 		type InvoiceListItem,
@@ -103,7 +104,33 @@
 	});
 
 	const sentence = $derived(summarySentence(summary, today));
+
+	/**
+	 * NOTHING AT ALL, rather than nothing under this tab.
+	 *
+	 * Until SPA-13 this screen branched on `filter === 'all'`, which is a guess about which tab
+	 * is showing rather than a fact about the business — so forty invoices filtered to nothing on
+	 * the All tab were told "Nothing invoiced yet", and a business with no invoices at all
+	 * sitting on Drafts was told "That is usually good news".
+	 *
+	 * ONE TERM WHERE INVENTORY NEEDS TWO. `countInvoices` counts under `is null archived_at`, so
+	 * `counts.all` is "unarchived invoices" — and `INVOICE_FILTERS` has no archived tab, no
+	 * archived count, and no surface anywhere in the module that lists an archived invoice, the
+	 * only archive path being "Discard a draft". So this is honest about everything the screen
+	 * can reach. Inventory needs the second term because it genuinely has an archived tab.
+	 *
+	 * The accepted edge: a business whose only invoices were discarded drafts is told "Nothing
+	 * invoiced yet", which is true of everything it can get to.
+	 */
+	const moduleIsEmpty = $derived(counts.all === 0);
 </script>
+
+{#snippet newInvoice()}
+	<Button onclick={oncreate} disabled={creating}>
+		<Plus class="size-4" aria-hidden="true" />
+		{creating ? 'Starting…' : 'New invoice'}
+	</Button>
+{/snippet}
 
 <!-- Page links carry a query string, not a route id — see the note in `InvoiceTable.svelte`. -->
 <!-- eslint-disable svelte/no-navigation-without-resolve -->
@@ -150,14 +177,20 @@
 		<FilterTabs active={filter} {counts} {hrefFor} />
 	</div>
 
-	{#if invoices.length === 0}
-		<p class="mt-8 text-ui text-ink-secondary">
-			{#if filter === 'all'}
-				Nothing invoiced yet. Start one and it will save as you go — you can close it and come back.
-			{:else}
-				Nothing here. That is usually good news.
-			{/if}
-		</p>
+	{#if moduleIsEmpty}
+		<!-- A panel with a way out of itself. The `mt-8` is this screen's margin; the primitive
+		     carries none of its own. -->
+		<EmptyState
+			class="mt-8"
+			icon={Receipt}
+			accentClass="text-invoicing"
+			heading="Nothing invoiced yet"
+			body={emptyCopy('all')}
+			action={readOnly ? undefined : newInvoice}
+		/>
+	{:else if invoices.length === 0}
+		<!-- A filter that matched nothing. One line, and nothing offered. -->
+		<NoMatches class="mt-8" message={emptyCopy(filter)} />
 	{:else}
 		<!-- Desktop: the six-column table. -->
 		<div class="hidden lg:block">
@@ -206,12 +239,15 @@
 		</nav>
 	{/if}
 
-	{#if !readOnly}
+	{#if !readOnly && !moduleIsEmpty}
 		<!--
 			The phone's primary action. `PrimaryAction` is `sticky`, not `fixed` — so at the bottom
 			of the scroll it comes to rest AFTER the last card rather than on top of it, with no
 			clearance padding to keep in sync. T22 makes that an acceptance criterion, and
 			`shell.mobile.spec.ts` has asserted it since T08.
+
+			Deliberately absent from the empty-module state, which already carries its own button —
+			the same rule `ItemList` keeps.
 		-->
 		<PrimaryAction class="lg:hidden" onclick={oncreate} disabled={creating}>
 			{creating ? 'Starting…' : 'New invoice'}

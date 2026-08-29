@@ -14,6 +14,7 @@
  * readable.
  */
 import { error } from '@sveltejs/kit';
+import { notFound } from '$lib/core/refusals';
 import { withModule } from '$lib/server/core/ctx';
 import { loadInvoiceRow, loadPayments } from '$lib/server/modules/invoicing/queries';
 import { workingsFor } from '$lib/server/modules/invoicing/ledger';
@@ -25,7 +26,7 @@ export const load: PageServerLoad = async (event) => {
 	return withModule(event, 'invoicing', 'read', async (ctx) => {
 		const header = await loadInvoiceRow(ctx.tx, event.params.id);
 		if (!header || header.archivedAt !== null) {
-			error(404, { message: "We couldn't find that invoice." });
+			error(404, notFound('invoice'));
 		}
 
 		const payments = await loadPayments(ctx.tx, header.id);

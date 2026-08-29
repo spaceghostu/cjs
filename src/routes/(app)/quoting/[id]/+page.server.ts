@@ -17,6 +17,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { effectiveStatus, issuerFrom, priceQuote, quoteDocument, todayIn } from '$lib/core/quoting';
+import { notFound, notFoundMessage } from '$lib/core/refusals';
 import { withModule } from '$lib/server/core/ctx';
 import { business as businessTable } from '$lib/server/core/db/schema/core';
 import { modulePrice, totalWith } from '$lib/server/core/modules/catalogue';
@@ -39,7 +40,7 @@ export const load: PageServerLoad = async (event) => {
 
 		// RLS has already made "another business's quote" and "no such quote" the same answer,
 		// which is exactly what they should be to somebody guessing at URLs.
-		if (!quote) error(404, { message: "We couldn't find that quote." });
+		if (!quote) error(404, notFound('quote'));
 
 		const [businessRow] = await ctx.tx
 			.select()
@@ -164,7 +165,7 @@ export const actions: Actions = {
 				const quote = await loadQuote(ctx.tx, event.params.id);
 				// `CannotSendQuote` rather than `error(404)`: a thrown redirect/error inside this
 				// try would be swallowed by the catch below and re-reported as a 500.
-				if (!quote) throw new CannotSendQuote("We couldn't find that quote.");
+				if (!quote) throw new CannotSendQuote(notFoundMessage('quote'));
 
 				if (quote.status !== 'accepted') {
 					throw new CannotSendQuote(

@@ -22,6 +22,7 @@
  */
 import { error, json } from '@sveltejs/kit';
 import { withModule } from '$lib/server/core/ctx';
+import { notFound } from '$lib/core/refusals';
 import { CannotDoThat } from '$lib/server/modules/inventory/effects';
 import { saveCountLine } from '$lib/server/modules/inventory/counts';
 import { loadStockCount, loadStockCountLines } from '$lib/server/modules/inventory/queries';
@@ -40,7 +41,7 @@ export const POST: RequestHandler = async (event) => {
 
 	return withModule(event, 'inventory', 'write', async (ctx) => {
 		const header = await loadStockCount(ctx.tx, event.params.id);
-		if (!header) error(404, { message: "We couldn't find that stock count." });
+		if (!header) error(404, notFound('stock count'));
 
 		if (header.status === 'applied') {
 			error(409, {

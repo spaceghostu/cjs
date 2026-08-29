@@ -30,7 +30,7 @@
 	 */
 	import { enhance } from '$app/forms';
 	import { onMount } from 'svelte';
-	import { Button, qtyText } from '$lib/ui';
+	import { Button, Refusal, qtyText } from '$lib/ui';
 	import {
 		CountApplied,
 		CountFooter,
@@ -134,15 +134,11 @@
 		locale={data.locale}
 		status={save.status}
 		error={save.error}
+		onretry={() => void save.flush()}
 	/>
 
 	{#if form?.message}
-		<p
-			class="mt-4 rounded-[10px] border border-wrong-border bg-wrong-tint px-4 py-3 text-ui text-wrong-ink"
-			aria-live="polite"
-		>
-			{form.message}
-		</p>
+		<Refusal message={form.message} class="mt-4" />
 	{/if}
 
 	{#if data.count.status === 'preparing'}

@@ -37,6 +37,7 @@
 		FieldError,
 		Input,
 		Label,
+		Refusal,
 		Select,
 		SelectContent,
 		SelectItem,
@@ -72,6 +73,7 @@
 		issuing = false,
 		message = null,
 		onsave,
+		onsaveretry,
 		onissue,
 		ondiscard
 	}: {
@@ -85,6 +87,13 @@
 		saving?: boolean;
 		issuing?: boolean;
 		message?: string | null;
+		/**
+		 * Present only when `message` came from the SAVE endpoint, so the banner offers a retry
+		 * for a save that did not land and offers nothing for a form action, whose own button
+		 * already is the retry. It takes the payload for the same reason `onissue` does: the
+		 * retry has to be built from what is on the screen NOW, not from whatever failed.
+		 */
+		onsaveretry?: (payload: unknown) => void;
 		onsave: (payload: unknown) => void;
 		/** Takes the payload too: issuing FLUSHES it first. See the page's `issue()`. */
 		onissue: (payload: unknown) => void;
@@ -150,13 +159,20 @@
 			<Button variant="secondary" onclick={ondiscard}>Discard</Button>
 		</div>
 
+		<!--
+			This editor saves on an explicit Save rather than as you type, so a retry is simply
+			that same save again — built from what is on the screen NOW, never from a payload
+			captured when the failure happened, which would quietly discard anything typed since.
+			The page only decides WHETHER to offer it: `onsaveretry` is passed when the message
+			came from the save endpoint and withheld when it came from a form action, where the
+			action's own button is the retry.
+		-->
 		{#if message}
-			<p
-				class="mt-4 rounded-[10px] border border-wrong-border bg-wrong-tint px-4 py-3 text-ui text-wrong-ink"
-				aria-live="polite"
-			>
+			<Refusal
 				{message}
-			</p>
+				onretry={onsaveretry ? () => onsaveretry(patchFromEditor(state)) : undefined}
+				class="mt-4"
+			/>
 		{/if}
 
 		<p

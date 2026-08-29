@@ -14,6 +14,7 @@
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import { Refusal } from '$lib/ui';
 	import { QuoteEditor, SentQuote } from '$lib/components/quoting';
 	import type { PageData, ActionData } from './$types';
 
@@ -55,13 +56,13 @@
 		}}
 	></form>
 
+	<!--
+		Where a send that could not be sent surfaces — the 502 from `sendQuote` when the mail
+		transport refuses, and the two `CannotSendQuote` 422s. `Refusal` carries its own polite
+		live region, so the wrapping paragraph that used to carry one is gone rather than kept.
+	-->
 	{#if form?.message}
-		<p
-			class="mx-8 mt-4 rounded-[10px] border border-wrong-border bg-wrong-tint px-4 py-3 text-ui text-wrong-ink"
-			aria-live="polite"
-		>
-			{form.message}
-		</p>
+		<Refusal message={form.message} class="mx-8 mt-4" />
 	{/if}
 
 	<QuoteEditor

@@ -210,6 +210,7 @@
 		{sending}
 		canSend={blockers.length === 0}
 		onsend={send}
+		onretry={() => void autosave.flush()}
 	/>
 
 	<div class="flex min-h-0 flex-1">

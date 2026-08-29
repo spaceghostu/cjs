@@ -20,8 +20,21 @@
 	let {
 		status,
 		savedAtMs,
-		error
-	}: { status: SaveStatus; savedAtMs: number; error: string | null } = $props();
+		error,
+		onretry
+	}: {
+		status: SaveStatus;
+		savedAtMs: number;
+		error: string | null;
+		/**
+		 * DELIBERATELY NOT A `Refusal`. This is a 13px status line with a tick and a clock, not a
+		 * panel — the same relationship `FieldError` has to a form banner. So the retry is a text
+		 * button inside the existing single polite region rather than a second live region beside
+		 * it. `Autosave.flush()` is safe to call repeatedly and puts the failed payload back
+		 * before it flips status, so pressing this can lose nothing.
+		 */
+		onretry?: () => void;
+	} = $props();
 </script>
 
 <p class="flex items-center gap-1.5 text-[13px]" aria-live="polite">
@@ -30,6 +43,15 @@
 		<span class="text-wrong-ink">
 			{error ?? 'We could not save your changes just now.'} Your work is still on this screen.
 		</span>
+		{#if onretry}
+			<button
+				type="button"
+				onclick={onretry}
+				class="shrink-0 rounded-[5px] text-wrong-ink underline underline-offset-2 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
+			>
+				Try again
+			</button>
+		{/if}
 	{:else if status === 'saving'}
 		<span class="text-ink-muted">Saving…</span>
 	{:else if status === 'pending'}

@@ -18,6 +18,7 @@
  * there is.
  */
 import { error } from '@sveltejs/kit';
+import { notFound } from '$lib/core/refusals';
 import { withBusiness } from '$lib/server/core/ctx';
 import { pdfFilename, renderDocumentPdf } from '$lib/server/core/pdf';
 import { printableQuote } from '$lib/server/modules/quoting/public';
@@ -52,13 +53,13 @@ export const GET: RequestHandler = async (event) => {
 		return null;
 	});
 
+	// The same sentence every other tenant-scoped id route says, from the same helper. This
+	// route's isolation is PURE RLS — `printableQuote`/`printableInvoice` load by id alone and
+	// the policy is the filter — so a rival business's real document id and a random UUID have
+	// to be indistinguishable here, and on the route whose success path returns rendered
+	// document bytes that matters more than anywhere else. `not-found.test.ts` proves it.
 	if (!document) {
-		error(404, {
-			code: 'no_such_document',
-			message: "We couldn't find that document.",
-			nextHref: '/',
-			nextLabel: 'Back to your dashboard'
-		});
+		error(404, notFound('document'));
 	}
 
 	const bytes = await renderDocumentPdf(document);

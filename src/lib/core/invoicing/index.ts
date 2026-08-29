@@ -55,6 +55,7 @@ export type { InvoiceDocumentInput } from './document';
 export {
 	DUE_SOON_DAYS,
 	detailSentence,
+	emptyCopy,
 	openCountPhrase,
 	overdueIsNone,
 	statusCopy,
