@@ -68,8 +68,14 @@
  *   --state-X-border*  control it outlines, and the light destructive outline is 2.26:1 by
  *                      design. If an edge ever becomes the ONLY signal, it needs its own
  *                      assertion.
- *   --paper-*          The printed document. Measured against --paper-bg only, never
- *                      against a screen surface, and never redefined by `.light`.
+ *   --paper-bg         The printed SHEET, and the ground the two below are measured on.
+ *   --paper-ink*       A GLYPH on that sheet. Measured against --paper-bg at 4.6:1, and
+ *                      never against a screen surface.
+ *   --paper-rule*      An EDGE on it. Unmeasured, for the same reason --border-* is:
+ *                      --paper-rule is 1.25:1 on the sheet by design. A --paper-* token
+ *                      that is none of these three fails the suite BY NAME, same as above.
+ *                      None of the three is ever redefined by `.light`, because a quote
+ *                      coming off a printer does not have a dark mode.
  *   --radius* --motion-*  Not colours. Classified so nothing is skipped silently.
  *
  * A token in this block matching none of the above fails the suite BY NAME. That is

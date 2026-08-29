@@ -136,8 +136,15 @@
 		decides is the tab sequence. Declared first, the sheet preceded the button that opens
 		it: pressing Enter on More opened a menu that forward-Tab could never reach, because
 		Tab went on past the nav entirely and the rows were only reachable by shift-Tabbing
-		back through all five links. Declared last, Tab from More lands on the first row, which
-		is what someone who just opened a menu is asking for.
+		back over More and all four destination links. Declared last, Tab from More lands on
+		the first row, which is what someone who just opened a menu is asking for.
+
+		The rows below close the sheet with a bare `moreOpen = false` rather than by calling
+		`closeMore()`, and the difference is deliberate. Escape and the scrim are DISMISSALS:
+		the person is staying where they are, so the sheet has to hand focus back to the
+		button they opened it from or it lands on nothing. A row is a DEPARTURE — they are
+		going somewhere else, and pulling focus back onto More on the way out would fight the
+		destination for it.
 	-->
 	{#if moreOpen}
 		<div

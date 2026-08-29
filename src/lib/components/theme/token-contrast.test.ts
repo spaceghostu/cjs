@@ -8,6 +8,7 @@ import {
 	WCAG_AA_TEXT
 } from '$lib/core/color/contrast.js';
 import { composite, mixOklab } from '$lib/core/color/mix.js';
+import { BRAND_OPTIONS, DEFAULT_BRAND } from './brand.js';
 
 /**
  * The design states a 4.6:1 contrast floor. This measures whether `layout.css` actually
@@ -31,7 +32,7 @@ import { composite, mixOklab } from '$lib/core/color/mix.js';
  * name the token so it falls into the bucket that describes what it is, or add a rule to
  * `classify()` and say in prose what that new kind of token is held to.
  *
- * Three things are deliberately classified but NOT measured. Each exclusion below was
+ * Four things are deliberately classified but NOT measured. Each exclusion below was
  * measured before it was written down, rather than assumed:
  *
  *   `border` — light `--state-wrong-border-quiet` is 2.26:1 on `--surface-base`, so a
@@ -46,6 +47,12 @@ import { composite, mixOklab } from '$lib/core/color/mix.js';
  *     `input.svelte:19`), and `--brand` against the reading surfaces IS measured, in `the
  *     primary button` below. `--brand-focus-ring`, which is the indicator everywhere else,
  *     is measured on all six surfaces in both themes.
+ *   `--paper-rule*` — the edge half of the `paper` bucket, and a border by another name.
+ *     `--paper-rule` is 1.25:1 on `--paper-bg` and `--paper-rule-light` is 1.13:1, so any
+ *     bar would fail on the first run. The rest of the bucket IS measured: `--paper-bg` is
+ *     the ground and every `--paper-ink*` is held to the design floor on it. See `the
+ *     printed sheet` below, which asserts that split is exhaustive so a paper token of a
+ *     fourth kind cannot slip between the two lists.
  *   `non-colour` — `--radius*` and `--motion-*` are lengths and easings. There is nothing
  *     to measure. They are classified anyway so exhaustiveness accounts for them instead
  *     of skipping anything it does not recognise.
@@ -452,38 +459,84 @@ describe.each(THEMES)('%s theme', (_theme, tokens) => {
 		}
 	});
 
-	it('--decoration-quiet is never good enough for text, which is why it is named that', () => {
-		// If this ever passes, the token has drifted into being a text colour and the name
-		// stops protecting anyone. #7D7F88 measures 4.22:1 on --surface-card — below both
-		// AA and the design's own floor.
-		//
-		// Deliberately scoped to --surface-card and NOT generalised to every surface: in
-		// dark the same colour measures 4.80:1 on --surface-base and 4.62:1 on
-		// --surface-sunken, so a blanket "fails everywhere" assertion would fail on the
-		// first run. What is being pinned is that the token is unusable on the surface most
-		// helper text is drawn on, which is what makes the name honest.
-		expect(contrastRatio(tokens['--decoration-quiet'], tokens['--surface-card'])).toBeLessThan(
-			WCAG_AA_TEXT
-		);
+	/**
+	 * DERIVED FROM THE BUCKET, not from a name typed out here. It used to name
+	 * `--decoration-quiet` directly, which left the bucket classified but measured by
+	 * nothing: a `--decoration-hairline` added tomorrow would have passed the exhaustiveness
+	 * check — `classify()` puts it in `decoration` — and then been held to no bar at all.
+	 * That is this file's own silent hole, reopened one bucket to the left of where it was
+	 * being watched for. If one of these ever PASSES, that token has drifted into being a
+	 * text colour and the `--decoration-` prefix has stopped protecting anyone.
+	 *
+	 * Deliberately scoped to `--surface-card` and NOT generalised to every surface:
+	 * `--decoration-quiet` is 4.22:1 there, but in dark the same colour measures 4.80:1 on
+	 * `--surface-base` and 4.62:1 on `--surface-sunken`, so a blanket "fails everywhere"
+	 * assertion would fail on the first run. What is pinned is that the token is unusable on
+	 * the surface most helper text is drawn on, which is what makes the name honest.
+	 */
+	it('has a decoration bucket at all', () => {
+		// Its own assertion rather than a line inside the `it.each` below, because a guard
+		// placed there could never fire: an empty bucket generates ZERO tests and the guard
+		// never runs. That is the same shape of mistake as the vacuous focus test this pass
+		// was opened to fix, and it would be a poor one to make in this file of all files.
+		expect(bucketOf('decoration').length).toBeGreaterThan(0);
+	});
+
+	it.each(bucketOf('decoration'))('%s is never good enough for text', (name) => {
+		expect(
+			contrastRatio(tokens[name], tokens['--surface-card']),
+			`${name} is legible on --surface-card, so its name is now a lie`
+		).toBeLessThan(WCAG_AA_TEXT);
 	});
 });
 
-describe('paper is theme-invariant', () => {
-	it.each(bucketOf('paper'))('%s is not redefined by .light', (name) => {
+/**
+ * THE PRINTED SHEET, which is its own little world: one ground, and everything else drawn
+ * on it. Nothing here is ever measured against a screen surface, and nothing here is ever
+ * redefined by `.light` — a quote that came out of the printer in dark mode would be a
+ * black rectangle.
+ *
+ * The bucket is split three ways INSIDE this block — the ground `--paper-bg`, the glyphs
+ * `--paper-ink*` held to the design floor on it, and the rules `--paper-rule*` left
+ * unmeasured for the reason and with the numbers given in the file header — and that split
+ * is asserted exhaustive below. Before this, the theme-invariance check ran over the whole
+ * bucket but the two contrast checks named `--paper-ink` and `--paper-ink-muted` by hand,
+ * so a `--paper-ink-faint` would have been classified, checked for invariance, and then
+ * measured against nothing.
+ *
+ * Measured in dark only, and that is not a gap: the invariance assertion immediately below
+ * proves there is no second set of values to measure.
+ */
+describe('the printed sheet', () => {
+	const PAPER = bucketOf('paper');
+	const PAPER_INKS = PAPER.filter((name) => name.startsWith('--paper-ink'));
+	const PAPER_RULES = PAPER.filter((name) => name.startsWith('--paper-rule'));
+
+	it('is a ground, some ink and some rules, and nothing else', () => {
+		// The intra-bucket exhaustiveness check. `--paper-flourish` would land in the `paper`
+		// bucket, sail through `classifies every token the design block declares`, and be
+		// measured by neither list above. It fails here instead, by its own name.
+		const accounted = new Set(['--paper-bg', ...PAPER_INKS, ...PAPER_RULES]);
+		expect(
+			PAPER.filter((name) => !accounted.has(name)),
+			'These paper tokens are neither the sheet, an ink nor a rule, so nothing measures ' +
+				'them. Name one --paper-ink* or --paper-rule*, or give it its own bar here.'
+		).toEqual([]);
+
+		expect(PAPER).toContain('--paper-bg');
+		expect(PAPER_INKS.length).toBeGreaterThan(0);
+	});
+
+	it.each(PAPER)('%s is not redefined by .light', (name) => {
 		expect(dark[name]).toBeDefined();
 		expect(LIGHT_RAW[name]).toBeUndefined();
 	});
 
-	it('paper ink is legible on paper', () => {
-		expect(contrastRatio(dark['--paper-ink'], dark['--paper-bg'])).toBeGreaterThanOrEqual(
-			DESIGN_TEXT_FLOOR
-		);
-	});
-
-	it('paper muted ink is legible on paper', () => {
-		expect(contrastRatio(dark['--paper-ink-muted'], dark['--paper-bg'])).toBeGreaterThanOrEqual(
-			DESIGN_TEXT_FLOOR
-		);
+	it.each(PAPER_INKS)('%s is legible on the sheet', (name) => {
+		expect(
+			contrastRatio(dark[name], dark['--paper-bg']),
+			`${name} on --paper-bg`
+		).toBeGreaterThanOrEqual(DESIGN_TEXT_FLOOR);
 	});
 });
 
@@ -538,11 +591,31 @@ describe('known deviations', () => {
 	 * `--accent-quoting` on raised). The criterion is that the floor holds on the surface a
 	 * word ACTUALLY sits on, so each of the four was traced to where the colour is painted:
 	 *
-	 *   `--accent-*` on `--surface-raised` happens in exactly one place, the active sidebar
-	 *     row. `AppSidebar.svelte` sets the raised background at line 89
-	 *     (`class:bg-surface-raised={active}`) and the accent lands on the ICON at lines
-	 *     103-108, which carries `aria-hidden="true"`. The row's label right beside it is
-	 *     `text-ink`. Nothing there is a word in an accent.
+	 *   `--accent-*` on `--surface-raised` is not one call site but four, and in every one of
+	 *     them the accent is on an `aria-hidden` icon with the words beside it in `--text-*`.
+	 *     This list is the whole of a sweep, not an example: every `accentText()` call site
+	 *     in `src/lib` was read against the background it renders on, and these are the four
+	 *     whose background is or becomes `--surface-raised`. An earlier version of this
+	 *     comment claimed one, which was the sidebar and three misses.
+	 *
+	 *       `AppSidebar.svelte` — raised background at line 89
+	 *         (`class:bg-surface-raised={active}`), accent on the icon at lines 103-108. The
+	 *         row's label right beside it is `text-ink`.
+	 *       `ModuleRow.svelte` — raised at line 54 (`class:bg-surface-raised={owned}`),
+	 *         accent on the icon at line 60. The module's name beside it is `text-ink`.
+	 *       `ContextualAdd.svelte` — raised at line 64, unconditionally, accent on the icon
+	 *         at line 67. The headline beside it is `text-ink`.
+	 *       `ResumePanel.svelte` — the row is `--surface-card` at line 42 and goes raised on
+	 *         `hover:bg-surface-raised`, with the accent on the icon at line 44. It is the
+	 *         only one of the four where the pairing exists solely in a hover state, which
+	 *         is why a sweep for a literal `bg-surface-raised` beside an accent would have
+	 *         missed it too.
+	 *
+	 *     What is NOT in the list, because it looks like it should be: the raised panel in
+	 *     `AddModuleDialog.svelte:79` and `RemoveModuleDialog.svelte:62` holds a large
+	 *     figure in a module colour, but `StatDelta.svelte:38-46` draws it in the `-ink`
+	 *     family (`text-quoting-ink` and its siblings), not in the raw accent — and the inks
+	 *     are measured on all six surfaces by `INK_ACCENTS` above.
 	 *   `--state-wrong` as a word never lands on raised or quiet. `SaveState.svelte:29` puts
 	 *     the raw colour on an aria-hidden icon and the WORDS in `--state-wrong-ink` at line
 	 *     30. `FieldError.svelte:59` draws in `text-wrong`, but only ever on the four
@@ -656,8 +729,14 @@ describe('the per-tenant brand ramp', () => {
 	 * because `.light [data-brand]` sets `--brand-focus-ring: var(--brand-hover)` while
 	 * `--brand-hover` is declared in a different block; a resolver run over one block would
 	 * dead-end on that alias.
+	 *
+	 * The four values are IMPORTED from `brand.ts` for the same reason the ramp is read out
+	 * of the stylesheet: this list used to be four hex literals retyped here, and the note
+	 * below already said the options live in `brand.ts`. A fifth option added there — or a
+	 * hue retuned — would have left this suite measuring a set nobody ships any more while
+	 * reporting four green tests. Now adding one adds three assertions.
 	 */
-	const OPTIONS = ['#5464EE', '#277E94', '#8660BF', '#2A835B'];
+	const OPTIONS = BRAND_OPTIONS.map((option) => option.value);
 
 	function tenant(option: string, theme: 'dark' | 'light'): Resolved {
 		const base = theme === 'dark' ? darkRaw : lightRaw;
@@ -700,8 +779,10 @@ describe('the per-tenant brand ramp', () => {
 	});
 
 	it('matches what layout.css declares for the default', () => {
-		// The options list lives in `brand.ts` and the default lives in the stylesheet.
-		// This is the assertion that keeps them the same colour.
-		expect(dark['--brand'].toLowerCase()).toBe(OPTIONS[0].toLowerCase());
+		// The default lives in `brand.ts` and the stylesheet declares a `--brand` of its own
+		// for a business that has not picked one. This is the assertion that keeps them the
+		// same colour, and it names `DEFAULT_BRAND` rather than `OPTIONS[0]` because the
+		// default being first in the list is a convenience, not the contract.
+		expect(dark['--brand'].toLowerCase()).toBe(DEFAULT_BRAND.toLowerCase());
 	});
 });

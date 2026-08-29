@@ -37,14 +37,15 @@
 					{@const row = moduleRow(line.module)}
 					<li class="flex items-center gap-3 border-b border-line-subtle py-3">
 						<!--
-						6px accent dot. Wayfinding, never a field of colour.
+							6px accent dot. Wayfinding, never a field of colour.
 
-						T27 §6, checked and closed: nothing here is conveyed by colour alone. The dot is
-						`aria-hidden="true"`, so it is not in the accessibility tree at all, and the
-						module's identity is carried by the label immediately beside it. Remove every
-						colour from this list and it still reads as Quoting, Invoicing, Inventory with a
-						price against each. The dot is a second way to tell them apart, never the only one.
-					-->
+							T27 §6, checked and closed: nothing here is conveyed by colour alone. The dot is
+							`aria-hidden="true"`, so it is not in the accessibility tree at all, and the
+							module's identity is carried by the label immediately beside it. Remove every
+							colour from this list and it still reads as Quoting, Invoicing, Inventory with a
+							price against each. The dot is a second way to tell them apart, never the only
+							one.
+						-->
 						<span
 							aria-hidden="true"
 							class="size-1.5 shrink-0 rounded-full bg-current {accentText(row.accent)}"

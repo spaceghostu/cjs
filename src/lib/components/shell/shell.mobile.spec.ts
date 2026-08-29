@@ -232,7 +232,7 @@ describe('primary action', () => {
  * rather than 2px.
  */
 describe('bottom navigation — keyboard', () => {
-	/** Every slot in the bar: the five links plus More. */
+	/** Every slot in the bar: the four destination links plus More. */
 	function bar(root: HTMLElement): HTMLElement[] {
 		return [...root.querySelectorAll<HTMLElement>('ul a, ul button')];
 	}
@@ -288,12 +288,30 @@ describe('bottom navigation — keyboard', () => {
 		// Everything inside the sheet is destroyed when it closes, so without an explicit
 		// restore the browser drops focus on <body> and the next Tab starts over from the top
 		// of the document.
+		//
+		// FOCUS IS MOVED INTO THE SHEET FIRST, and that is the entire test. Pressing Escape
+		// while the More button still holds focus asserts nothing: the button is not inside
+		// `{#if moreOpen}`, so nothing destroys it, and `document.activeElement` is still the
+		// trigger afterwards whether or not `closeMore()` restores anything. This version puts
+		// the keyboard on a row that the close DOES destroy, so the only way the final
+		// assertion passes is if something deliberately put focus back.
 		const root = render(MobileNavComponent, { nav: mobileNav(THORNHILL), pathname: '/' });
 		const trigger = moreTrigger(root);
 
 		trigger.focus();
 		trigger.click();
 		await Promise.resolve();
+
+		await userEvent.tab();
+
+		// Asserted rather than assumed, and it is a guard against this test quietly going
+		// vacuous a second time. If the sheet ever moves back in front of its trigger, Tab
+		// leaves the nav instead of entering the sheet, focus lands on something the close
+		// cannot destroy, and the assertion below would start passing for the old wrong
+		// reason. Failing here says so out loud.
+		const sheetRow = root.querySelector<HTMLElement>('nav > div a');
+		expect(sheetRow, 'the sheet rendered no rows').not.toBeNull();
+		expect(document.activeElement, 'Tab from More did not enter the sheet').toBe(sheetRow);
 
 		await userEvent.keyboard('{Escape}');
 
