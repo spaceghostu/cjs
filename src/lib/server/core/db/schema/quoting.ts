@@ -139,6 +139,33 @@ export const quote = pgTable(
 		customerId: uuid().references(() => customer.id, { onDelete: 'restrict' }),
 
 		/**
+		 * THE WORK THIS QUOTE IS ABOUT — `core_job`.
+		 *
+		 * Deliberately no `.references()`. The foreign key is COMPOSITE —
+		 * `(business_id, job_id) -> core_job (business_id, id)` — and drizzle-kit has no builder
+		 * for one, so it is hand-written in `drizzle/0010_jobs_platform.sql`, exactly as
+		 * `inventory_movement.itemId` and this table's own `(id, currency)` are.
+		 *
+		 * WHY COMPOSITE. Postgres performs referential integrity with row security BYPASSED, so a
+		 * single-column key would happily accept business A's quote pointing at business B's job.
+		 * The composite form makes a cross-tenant link a database error rather than a policy
+		 * nobody enforces. (`customer_id` above predates this idiom and is NOT composite;
+		 * retrofitting it is a separate decision, so the inconsistency is acknowledged here
+		 * rather than implied safe.)
+		 *
+		 * NULLABLE, PERMANENTLY. A quote can be sent the moment somebody rings up, and a job is
+		 * created only when the client says yes — so a live quote has no job, and a declined or
+		 * expired one sits unlinked forever. `MATCH SIMPLE` (the default) skips the check
+		 * entirely when any column of the key is NULL, so the constraint costs that nothing.
+		 *
+		 * This is a REAL constraint where `source_item_id` on the lines below is deliberately
+		 * FK-less, and the difference is what each one must survive: a line's source item must
+		 * outlive a business removing Inventory, whereas `core_job` is floor and is never
+		 * removed.
+		 */
+		jobId: uuid(),
+
+		/**
 		 * WHAT THIS DOCUMENT SAYS ABOUT THE CLIENT — snapshot 1.
 		 *
 		 * Copied from `core_customer` when the client is chosen, and owned by the quote from
@@ -256,6 +283,9 @@ export const quote = pgTable(
 	},
 	(t) => [
 		unique('quoting_quote_id_currency').on(t.id, t.currency),
+
+		// The jobs derivation asks "what has this job been quoted?" and nothing else.
+		index('quoting_quote_job_idx').on(t.businessId, t.jobId),
 
 		oneOf('quoting_quote_status_known', t.status, QUOTE_STATUSES),
 		oneOf('quoting_quote_pricing_mode_known', t.pricingMode, PRICING_MODES),

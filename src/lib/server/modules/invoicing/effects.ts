@@ -118,6 +118,18 @@ export async function createFromQuote(
 	source: {
 		readonly quoteId: string;
 		readonly quoteNumber: string | null;
+		/**
+		 * The job the quote was for, if it had one.
+		 *
+		 * An invoice raised from a quote inherits the quote's job the same way it inherits
+		 * `source_quote_id` — and unlike `source_quote_id`, this link is a real (composite)
+		 * foreign key, because `core_job` is floor and is never removed with a module.
+		 *
+		 * This is the only quote-to-invoice path in the product, so without it no invoice in the
+		 * running system would ever carry a job, and `jobCommercialState` could never leave
+		 * `accepted` — while every hand-linked test fixture went on passing.
+		 */
+		readonly jobId: string | null;
 		readonly customerId: string | null;
 		readonly customer: Record<string, string | null>;
 		readonly sendToName: string | null;
@@ -166,6 +178,7 @@ export async function createFromQuote(
 			dueDate: addDays(today, settings.paymentTermsDays),
 			sourceQuoteId: source.quoteId,
 			sourceQuoteNumber: source.quoteNumber,
+			jobId: source.jobId,
 			pricingMode: source.pricingMode,
 			taxEngine: source.taxEngine,
 			vatRatePpm: source.vatRatePpm,

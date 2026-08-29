@@ -48,7 +48,9 @@ import {
 	type InvoiceLine,
 	type InvoicePayment
 } from '$lib/core/invoicing';
+import { JOB_PRIORITIES, JOB_STATUSES, type Job } from '$lib/core/jobs';
 import type { business, customer, member, MemberRole } from './schema/core';
+import type { job } from './schema/jobs';
 import type { quote, quoteLine } from './schema/quoting';
 import type { invoice, invoiceLine, invoicePayment } from './schema/invoicing';
 
@@ -270,6 +272,39 @@ export function toCustomer(row: CustomerRow): Customer {
 		vatNumber: row.vatNumber,
 		address: toAddress(row),
 		archivedAt: row.archivedAt
+	};
+}
+
+// ── Jobs ────────────────────────────────────────────────────────────────────────────
+
+type JobRow = typeof job.$inferSelect;
+
+/**
+ * A job, from its row.
+ *
+ * The simplest mapper in this file, and that is the point rather than an accident: a job holds
+ * no money at all, because the money is on the quotes and invoices linked to it and
+ * `$lib/core/jobs/commercial.ts` folds those on read. A mapper with nothing to construct is what
+ * the status split looks like from down here.
+ *
+ * `number_formatted` becomes `ref`: the row keeps prefix, value and formatted so that sorting
+ * and printing stay different questions, and the domain type needs only the answer a screen
+ * shows.
+ */
+export function toJob(row: JobRow): Job {
+	return {
+		id: row.id,
+		businessId: row.businessId,
+		ref: row.numberFormatted,
+		customerId: row.customerId,
+		service: row.service,
+		area: row.area,
+		description: row.description,
+		priority: narrow(row.priority, JOB_PRIORITIES, 'job priority'),
+		status: narrow(row.status, JOB_STATUSES, 'job status'),
+		startedByUserId: row.startedByUserId,
+		archivedAt: row.archivedAt,
+		createdAt: row.createdAt
 	};
 }
 

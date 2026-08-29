@@ -18,6 +18,19 @@
  * ANSWERING IS A WRITE, and writes still go through `tenant_isolation`. The token resolves the
  * tenant; the update then runs as that tenant, scoped to one quote id, with no user attached —
  * which is the honest attribution, because there is no user.
+ *
+ * ACCEPTANCE IS THE CONVERSION POINT
+ * ----------------------------------
+ * "The client said yes" is the moment speculative work becomes real work, so it is the moment a
+ * JOB comes into existence. `core_job` is floor rather than a module (see
+ * `db/schema/jobs.ts`), which is what makes creating one here legitimate: this transaction
+ * applies no entitlement gate at all, and it must not — the person on the other end of it is a
+ * client with a link, not a subscriber.
+ *
+ * The job INSERT is admitted by the ordinary `tenant_isolation` policy, exactly as the
+ * `quoting_quote_event` insert beside it already is. No `document_share` policy is involved and
+ * none is wanted: the client never reads the job, and the four SELECT-only share policies in
+ * `0006_quote_sharing.sql` are deliberately the whole of this database's public surface.
  */
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { effectiveStatus, hasExpired, todayIn, type Quote } from '$lib/core/quoting';
@@ -29,6 +42,8 @@ import type { PrintableDocument } from '$lib/core/document';
 import { notFoundMessage } from '$lib/core/refusals';
 import { toQuote } from '$lib/server/core/db/map';
 import { quoteLine } from '$lib/server/core/db/schema/quoting';
+import { createJob } from '$lib/server/core/jobs';
+import type { Tx } from '$lib/server/core/db/tx';
 import { recordEvent } from './events';
 import { hashShareToken } from './send';
 import { loadSettings } from './queries';
@@ -204,7 +219,7 @@ export async function answerSharedQuote(
 	}
 
 	await actAsSharedTenant(found.businessId, async (tx) => {
-		await tx
+		const [updated] = await tx
 			.update(quote)
 			.set(
 				answer === 'accepted'
@@ -214,7 +229,12 @@ export async function answerSharedQuote(
 			// The status predicate is not decoration: two people clicking Accept on the same
 			// emailed link at the same moment must produce one acceptance, and this is what
 			// makes the second one a no-op rather than a second event.
-			.where(and(eq(quote.id, found.id), sql`${quote.status} in ('sent', 'viewed')`));
+			.where(and(eq(quote.id, found.id), sql`${quote.status} in ('sent', 'viewed')`))
+			.returning({ id: quote.id, jobId: quote.jobId, customerId: quote.customerId });
+
+		if (answer === 'accepted' && updated && updated.jobId === null) {
+			await createJobFor(tx, found.businessId, updated.id, updated.customerId);
+		}
 
 		await recordEvent(tx, found.businessId, found.id, {
 			kind: answer,
@@ -225,4 +245,62 @@ export async function answerSharedQuote(
 	});
 
 	return { ok: true };
+}
+
+/**
+ * THE JOB THIS ACCEPTANCE CREATES.
+ *
+ * Called ONLY from inside the guarded UPDATE's result, and only when the row that came back had
+ * no job. That gating is the whole of the concurrency story: the pre-checks above run in a
+ * SEPARATE transaction from the update, so two people clicking Accept on the same emailed link
+ * both reach it and one of them matches zero rows — which is exactly what the comment on that
+ * `.where()` already describes. Creating the job beside the update rather than from its result
+ * would produce two jobs and burn two numbers for one acceptance.
+ *
+ * The second UPDATE, linking the quote to the job it just produced, is admitted: `0005_quoting`
+ * and `0006_quote_sharing` define only `quoting_quote_touch` and `quoting_quote_audit` on this
+ * table, so there is no freeze-style trigger to refuse a write to a row that has just become
+ * `accepted`.
+ *
+ * THE DESCRIPTION IS SEEDED FROM THE QUOTE'S FIRST LINE, because a job created automatically has
+ * nothing else in it — no service, no area, nobody's typing. "Kitchen units, supply and fit" is
+ * what makes the row nameable on the pipeline screen SPA-23 will build. Service and area are
+ * left null rather than guessed: `db/schema/inventory.ts` makes the case that a closed list is
+ * wrong for the third trade on day one, and an invented one is worse than an empty one.
+ */
+async function createJobFor(
+	tx: Tx,
+	businessId: string,
+	quoteId: string,
+	customerId: string | null
+): Promise<void> {
+	if (customerId === null) {
+		// Unreachable by construction, and thrown rather than asserted away with a `!`:
+		// `quoting_quote_customer_required_once_sent` (db/schema/quoting.ts) guarantees that a
+		// non-draft quote names a client, and the status gate above admits only `sent` and
+		// `viewed`. If it ever fires, one of those two has changed and this is the sentence that
+		// says which.
+		throw new Error(
+			`Quote ${quoteId} was accepted with no customer, which ` +
+				`quoting_quote_customer_required_once_sent should have made impossible.`
+		);
+	}
+
+	const [firstLine] = await tx
+		.select({ description: quoteLine.description })
+		.from(quoteLine)
+		.where(and(eq(quoteLine.quoteId, quoteId), isNull(quoteLine.archivedAt)))
+		.orderBy(quoteLine.position)
+		.limit(1);
+
+	const created = await createJob(tx, {
+		// From a row the TOKEN admitted, never from a request — `share.ts` states the rule and
+		// this is the caller it was written for.
+		businessId,
+		customerId,
+		description: firstLine?.description ?? null,
+		startedByUserId: null
+	});
+
+	await tx.update(quote).set({ jobId: created.id }).where(eq(quote.id, quoteId));
 }

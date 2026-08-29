@@ -182,6 +182,10 @@ export const actions: Actions = {
 				return createFromQuote(ctx.tx, ctx.business, {
 					quoteId: quote.id,
 					quoteNumber: quote.number,
+					// The row is already loaded two lines above and carries the column, so the
+					// job travels onto the invoice for the cost of reading a field. Null is the
+					// ordinary case for a quote accepted before SPA-20 existed.
+					jobId: row?.jobId ?? null,
 					customerId: quote.customer.customerId,
 					customer: {
 						name: quote.customer.name,

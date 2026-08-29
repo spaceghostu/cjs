@@ -248,6 +248,10 @@ export async function cleanupFixtures(): Promise<void> {
 					'quoting_quote_line',
 					'quoting_quote',
 					'quoting_setting',
+					// Jobs unwind between the documents that point at them and the customer they
+					// point at: a quote and an invoice each carry a composite foreign key to
+					// `core_job`, and `core_job` carries one to `core_customer`.
+					'core_job',
 					// Inventory unwinds innermost-first: a count line names a movement, a movement
 					// names an item and a location, and an item names its default location. The
 					// level view holds nothing of its own, so it needs no line here — which is the
