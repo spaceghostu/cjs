@@ -39,7 +39,7 @@
 				<li>
 					<a
 						href={card.href}
-						class="flex items-center gap-3.5 rounded-[10px] bg-surface-card px-4 py-3.5 transition-colors duration-150 ease-out-forward outline-none hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+						class="flex items-center gap-3.5 rounded-[10px] bg-surface-card px-4 py-3.5 transition-colors duration-150 ease-out-forward outline-none hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 					>
 						<Icon size={17} strokeWidth={1.75} aria-hidden="true" class={accentText(row.accent)} />
 

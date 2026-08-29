@@ -90,7 +90,7 @@
 			{:else}
 				<a
 					href={resolve('/inventory')}
-					class="rounded-sm text-ui text-brand-ink underline underline-offset-2 outline-none hover:text-ink-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+					class="rounded-sm text-ui text-brand-ink underline underline-offset-2 outline-none hover:text-ink-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 				>
 					pick from Inventory
 				</a>

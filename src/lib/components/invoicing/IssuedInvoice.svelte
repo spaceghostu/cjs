@@ -117,7 +117,11 @@
 	<div class="flex flex-wrap items-start justify-between gap-4">
 		<div class="min-w-0">
 			<p class="flex items-center gap-1.5 text-helper">
-				<a href="/invoicing" class="text-invoicing-ink hover:underline">Invoicing</a>
+				<a
+					href="/invoicing"
+					class="text-invoicing-ink outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
+					>Invoicing</a
+				>
 				<span class="text-decoration-quiet" aria-hidden="true">/</span>
 				<span class="numeric text-ink-muted">{document.number}</span>
 			</p>
@@ -232,7 +236,7 @@
 					<a
 						href="/documents/{invoiceId}/pdf"
 						data-sveltekit-reload
-						class="text-[13px] text-ink-secondary underline-offset-2 hover:underline"
+						class="text-[13px] text-ink-secondary underline-offset-2 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 					>
 						Download PDF
 					</a>

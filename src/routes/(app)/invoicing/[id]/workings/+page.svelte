@@ -53,7 +53,10 @@
 
 <div class="mx-auto w-full max-w-3xl px-4 py-8 lg:px-8">
 	<p class="text-helper">
-		<a href="/invoicing/{data.invoiceId}" class="text-invoicing-ink hover:underline">
+		<a
+			href="/invoicing/{data.invoiceId}"
+			class="text-invoicing-ink outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
+		>
 			← Back to {data.number ?? 'the invoice'}
 		</a>
 	</p>

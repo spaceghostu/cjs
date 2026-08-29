@@ -125,8 +125,8 @@
 					href={pageHref(page - 1)}
 					aria-disabled={page <= 1}
 					class="rounded-[7px] border border-line-control px-3 py-1.5 text-ui text-ink-secondary
-						outline-none hover:bg-surface-raised/60 focus-visible:outline-2
-						focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring
+						outline-none hover:bg-surface-raised/60 focus-visible:outline-2 focus-visible:outline-offset-2
+						focus-visible:outline-brand-focus-ring focus-visible:outline-solid
 						aria-disabled:pointer-events-none aria-disabled:opacity-40"
 				>
 					Previous
@@ -136,8 +136,8 @@
 					href={pageHref(page + 1)}
 					aria-disabled={page >= pageCount}
 					class="rounded-[7px] border border-line-control px-3 py-1.5 text-ui text-ink-secondary
-						outline-none hover:bg-surface-raised/60 focus-visible:outline-2
-						focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring
+						outline-none hover:bg-surface-raised/60 focus-visible:outline-2 focus-visible:outline-offset-2
+						focus-visible:outline-brand-focus-ring focus-visible:outline-solid
 						aria-disabled:pointer-events-none aria-disabled:opacity-40"
 				>
 					Next

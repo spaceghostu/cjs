@@ -206,7 +206,7 @@
 					<a
 						href={pdfHref}
 						data-sveltekit-reload
-						class="underline underline-offset-2 outline-none hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+						class="underline underline-offset-2 outline-none hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 					>
 						download the accepted quote as a PDF and invoice it yourself
 					</a>

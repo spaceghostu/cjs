@@ -16,7 +16,7 @@
 			'rounded-md text-ui font-medium',
 			'transition-colors duration-150 ease-out-forward',
 			// One ring, on every variant, in both themes: 2px --brand-focus-ring at 2px offset.
-			'outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring',
+			'outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring',
 			'disabled:pointer-events-none aria-disabled:pointer-events-none',
 			"[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
 		],

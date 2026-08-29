@@ -51,7 +51,7 @@
 		<button
 			type="button"
 			onclick={onSearch}
-			class="flex h-11 w-full items-center gap-2.5 rounded-lg border border-line-control bg-surface-card px-3.5 text-left text-ui text-ink-muted outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+			class="flex h-11 w-full items-center gap-2.5 rounded-lg border border-line-control bg-surface-card px-3.5 text-left text-ui text-ink-muted outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 		>
 			<Search size={17} aria-hidden="true" class="shrink-0" />
 			<span class="min-w-0 flex-1 truncate">Search, or ask a question</span>

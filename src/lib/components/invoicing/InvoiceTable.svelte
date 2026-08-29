@@ -109,8 +109,8 @@
 							href="/invoicing/{invoice.id}"
 							class="numeric text-[13px] text-ink outline-none
 								after:absolute after:inset-0 after:content-['']
-								focus-visible:outline-2 focus-visible:-outline-offset-2
-								focus-visible:outline-brand-focus-ring"
+								focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-focus-ring
+								focus-visible:outline-solid"
 						>
 							{#if invoice.number}
 								{invoice.number}
@@ -190,7 +190,7 @@
 		<a
 			href={sortHref(column)}
 			class="inline-flex items-center gap-1 rounded-[4px] outline-none hover:text-ink
-				focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring
+				focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid
 				{sort === column ? 'text-ink' : ''}"
 		>
 			{label}

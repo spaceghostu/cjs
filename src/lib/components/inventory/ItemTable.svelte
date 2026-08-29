@@ -73,8 +73,8 @@
 					>
 						<a
 							href={sortHref(column)}
-							class="rounded-[5px] outline-none hover:text-ink focus-visible:outline-2
-								focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+							class="rounded-[5px] outline-none hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2
+								focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 						>
 							{HEADINGS[column]}
 							<!--
@@ -99,8 +99,8 @@
 						<a
 							href="/inventory/{row.item.id}"
 							class="rounded-[5px] text-ui text-ink outline-none hover:underline
-								focus-visible:outline-2 focus-visible:outline-offset-2
-								focus-visible:outline-brand-focus-ring"
+								focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring
+								focus-visible:outline-solid"
 						>
 							{row.item.name}
 						</a>

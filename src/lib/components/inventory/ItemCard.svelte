@@ -23,7 +23,7 @@
 <a
 	href="/inventory/{row.item.id}"
 	class="flex min-h-11 flex-col gap-2.5 rounded-[10px] border p-4 outline-none
-		focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring
+		focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid
 		{low ? 'border-line-strong bg-surface-card' : 'border-line-default'}"
 >
 	<div class="flex items-start justify-between gap-3">

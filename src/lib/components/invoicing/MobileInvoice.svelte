@@ -100,8 +100,8 @@
 			href="/invoicing"
 			aria-label="Back to invoices"
 			class="-ml-2 flex size-11 items-center justify-center rounded-[8px] text-ink-secondary
-				outline-none hover:bg-surface-raised/60 focus-visible:outline-2 focus-visible:outline-offset-2
-				focus-visible:outline-brand-focus-ring"
+				outline-none hover:bg-surface-raised/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring
+				focus-visible:outline-solid"
 		>
 			<ChevronLeft class="size-5" aria-hidden="true" />
 		</a>
@@ -112,8 +112,8 @@
 			href="/documents/{invoiceId}/pdf"
 			data-sveltekit-reload
 			class="-mr-2 flex h-11 items-center rounded-[8px] px-2 text-[13px] text-ink-secondary
-				outline-none hover:bg-surface-raised/60 focus-visible:outline-2 focus-visible:outline-offset-2
-				focus-visible:outline-brand-focus-ring"
+				outline-none hover:bg-surface-raised/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring
+				focus-visible:outline-solid"
 		>
 			PDF
 		</a>

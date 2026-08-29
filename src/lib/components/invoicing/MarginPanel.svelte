@@ -60,8 +60,8 @@
 			{marginFootnote(fromInventory)}
 			<a
 				href={workingsHref}
-				class="text-brand-ink underline-offset-2 hover:underline focus-visible:outline-2
-					focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+				class="text-brand-ink underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2
+					focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 			>
 				See the workings.
 			</a>

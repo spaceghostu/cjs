@@ -272,7 +272,7 @@
 								<input
 									type="checkbox"
 									bind:checked={state.lines[i].noCharge}
-									class="size-4 rounded-[4px] border-line-control"
+									class="size-4 rounded-[4px] border-line-control outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 								/>
 								Included, no charge
 							</label>

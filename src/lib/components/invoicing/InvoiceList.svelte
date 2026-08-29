@@ -135,7 +135,7 @@
 		<a
 			href={exportHref}
 			data-sveltekit-reload
-			class="text-[13px] text-ink-secondary underline-offset-2 hover:underline lg:hidden"
+			class="text-[13px] text-ink-secondary underline-offset-2 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid lg:hidden"
 		>
 			Export
 		</a>
@@ -188,8 +188,8 @@
 				href={pageHref(page - 1)}
 				aria-disabled={page <= 1}
 				class="rounded-[7px] border border-line-control px-3 py-1.5 text-ui text-ink-secondary
-					outline-none hover:bg-surface-raised/60 focus-visible:outline-2 focus-visible:outline-offset-2
-					focus-visible:outline-brand-focus-ring aria-disabled:pointer-events-none aria-disabled:opacity-40"
+					outline-none hover:bg-surface-raised/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring
+					focus-visible:outline-solid aria-disabled:pointer-events-none aria-disabled:opacity-40"
 			>
 				Previous
 			</a>
@@ -198,8 +198,8 @@
 				href={pageHref(page + 1)}
 				aria-disabled={page >= pageCount}
 				class="rounded-[7px] border border-line-control px-3 py-1.5 text-ui text-ink-secondary
-					outline-none hover:bg-surface-raised/60 focus-visible:outline-2 focus-visible:outline-offset-2
-					focus-visible:outline-brand-focus-ring aria-disabled:pointer-events-none aria-disabled:opacity-40"
+					outline-none hover:bg-surface-raised/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring
+					focus-visible:outline-solid aria-disabled:pointer-events-none aria-disabled:opacity-40"
 			>
 				Next
 			</a>

@@ -57,7 +57,7 @@
 		<a
 			href="/invoicing/{invoice.id}"
 			class="text-[15px] text-ink outline-none after:absolute after:inset-0 after:content-['']
-				focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-focus-ring"
+				focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 		>
 			{invoice.customerName ?? 'No client chosen yet'}
 		</a>

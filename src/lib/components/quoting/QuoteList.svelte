@@ -105,7 +105,7 @@
 				<li class="border-b border-line-row last:border-b-0">
 					<a
 						href="/quoting/{quote.id}"
-						class="grid grid-cols-[1fr_auto] items-center gap-4 px-4 py-3 outline-none hover:bg-surface-raised focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-focus-ring"
+						class="grid grid-cols-[1fr_auto] items-center gap-4 px-4 py-3 outline-none hover:bg-surface-raised focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 					>
 						<span class="min-w-0">
 							<span class="flex flex-wrap items-center gap-2">

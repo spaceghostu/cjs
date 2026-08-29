@@ -99,7 +99,7 @@
 									aria-describedby={error('brandColor') ? 'brandColor-message' : undefined}
 								/>
 								<span
-									class="size-9 rounded-lg border-2 border-transparent peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-focus-ring"
+									class="size-9 rounded-lg border-2 border-transparent peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-focus-ring peer-focus-visible:outline-solid"
 									class:!border-ink={brandColor === option.value}
 									style="background: {option.value};"
 								></span>

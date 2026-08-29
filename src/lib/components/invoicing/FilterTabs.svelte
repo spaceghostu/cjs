@@ -44,8 +44,8 @@
 			aria-current={isActive ? 'page' : undefined}
 			data-active={isActive ? 'true' : undefined}
 			class="rounded-[7px] px-3 py-1.5 text-ui transition-colors outline-none
-				hover:bg-surface-raised/60 focus-visible:outline-2 focus-visible:outline-offset-2
-				focus-visible:outline-brand-focus-ring
+				hover:bg-surface-raised/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring
+				focus-visible:outline-solid
 				data-[active=true]:bg-surface-raised data-[active=true]:font-medium
 				{isActive ? 'text-ink' : 'text-ink-secondary'}"
 		>

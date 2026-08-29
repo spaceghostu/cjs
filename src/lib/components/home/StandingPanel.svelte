@@ -65,7 +65,7 @@
 						{#if point.href}
 							<a
 								href={point.href}
-								class="text-ui underline-offset-4 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+								class="text-ui underline-offset-4 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 								class:text-attention-ink={point.standing === 'attention'}
 								class:text-ink={point.standing === 'clear'}
 							>

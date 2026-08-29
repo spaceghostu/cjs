@@ -66,8 +66,19 @@ const preview: Preview = {
 		a11y: {
 			// A violation fails the run, in both themes. This is stricter than the shipped
 			// default ('todo', which only reports) and it is the point: contrast, labels and
-			// focus order are cheap to hold and expensive to retrofit. T27 audits the flows
-			// no story can reach; everything a story CAN reach is held here.
+			// focus order are cheap to hold and expensive to retrofit.
+			//
+			// T27's sweep of the flows no story can reach is done — shell, Home, quoting and
+			// invoicing — and what it found is recorded where it was found: the token floors
+			// in `token-contrast.test.ts`, the naming contract in `layout.css`, the bottom
+			// nav's keyboard behaviour in `shell.mobile.spec.ts`, and the two colour-alone
+			// verdicts in the components carrying the dots. Everything a story CAN reach
+			// stays held here, by this line.
+			//
+			// Worth knowing about its limits, because they are the reason those other files
+			// exist: axe checks names, roles, structure and colour contrast. It has no
+			// opinion on whether a focus ring actually renders, or on tab order — which is
+			// exactly where this codebase's real defects turned out to be.
 			test: 'error'
 		}
 	}

@@ -2,17 +2,23 @@
  * THE PHONE ASSERTIONS.
  *
  * Runs in a real Chromium at 390 × 844 — the design's reference frame — under the `mobile`
- * Vitest project. Two of the three things asserted here cannot be checked any other way:
- * a computed height and a scrollWidth are facts about layout, and a unit test that asserted
- * the CLASS `h-11` would pass while a parent's `line-height` quietly made the row 38px.
+ * Vitest project. Four of the five things asserted here cannot be checked any other way:
+ * a computed height, a scrollWidth, a resolved outline width and the difference between
+ * `sticky` and `fixed` are all facts about layout and the cascade, and a unit test that
+ * asserted the CLASS `h-11` would pass while a parent's `line-height` quietly made the row
+ * 38px. Only the count in 3 is a fact about markup.
  *
- * The four:
+ * The five:
  *   1. Every touch target is at least 44px.
  *   2. Nothing overflows 390px horizontally.
  *   3. The bottom nav renders five items and no more, whatever the business owns.
  *   4. The primary action comes to rest below the last row, never over it.
+ *   5. The bottom nav is operable from the keyboard: every slot resolves a real focus ring,
+ *      the More sheet follows its own trigger in document order, and closing the sheet puts
+ *      focus back on the button that opened it.
  */
 import { afterEach, describe, expect, it } from 'vitest';
+import { userEvent } from 'vitest/browser';
 import { createRawSnippet, mount, unmount, type Component } from 'svelte';
 // The real stylesheet. Without it every `h-11` is inert and a height assertion measures
 // nothing but the default line box — which would pass for the wrong reason.
@@ -204,5 +210,94 @@ describe('primary action', () => {
 		expect(lastRow!.getBoundingClientRect().bottom).toBeLessThanOrEqual(
 			button!.getBoundingClientRect().top + 1
 		);
+	});
+});
+
+/**
+ * THE KEYBOARD, which is the half of the bottom nav a thumb never exercises.
+ *
+ * This lives here rather than in a story because a focus ring is a fact about the CASCADE,
+ * not about a class string — the same argument the header above makes about `h-11`. It is
+ * also not something Storybook's a11y addon can cover: axe checks names, roles and colour
+ * contrast, and has no opinion at all about whether an element shows a focus indicator or
+ * where it sits in the tab order. MobileNav already appears in two stories, so the addon
+ * already sees it; these three assertions are what the addon cannot make.
+ *
+ * On what is asserted about the ring, and what deliberately is NOT: `layout.css` applies
+ * `* { @apply border-border outline-ring/50 }` in its base layer, so EVERY element in the
+ * document already resolves a non-empty `outlineColor`. Asserting on the colour would
+ * therefore have passed identically before and after the rings were added — a test that
+ * proves nothing while looking like it proves everything. `outlineWidth` discriminates,
+ * because the base layer sets no width and the UA default for a focused control is `auto`
+ * rather than 2px.
+ */
+describe('bottom navigation — keyboard', () => {
+	/** Every slot in the bar: the five links plus More. */
+	function bar(root: HTMLElement): HTMLElement[] {
+		return [...root.querySelectorAll<HTMLElement>('ul a, ul button')];
+	}
+
+	function moreTrigger(root: HTMLElement): HTMLElement {
+		const trigger = bar(root).at(-1);
+		if (!trigger) throw new Error('No More button rendered');
+		return trigger;
+	}
+
+	it('shows the design’s 2px ring on every slot under real keyboard focus', async () => {
+		const root = render(MobileNavComponent, { nav: mobileNav(THORNHILL), pathname: '/' });
+		const slots = bar(root);
+		expect(slots).toHaveLength(MOBILE_SLOTS);
+
+		for (const slot of slots) {
+			// Driven with a real Tab rather than `slot.focus()`, so the browser's own
+			// focus-visible heuristic is what decides — the same decision it makes for a
+			// person on a keyboard. The `:focus-visible` check is a loud guard: if the
+			// modality rule ever changes, this fails visibly instead of the width assertion
+			// below passing against an unfocused element.
+			await userEvent.tab();
+			expect(document.activeElement, 'tab order skipped a slot').toBe(slot);
+			expect(slot.matches(':focus-visible'), 'focused but not focus-visible').toBe(true);
+
+			const style = getComputedStyle(slot);
+			expect(style.outlineStyle, 'no outline style').not.toBe('none');
+			expect(style.outlineWidth, 'not the design’s 2px ring').toBe('2px');
+		}
+	});
+
+	it('puts the More sheet after its own trigger in document order', async () => {
+		// Stated as the invariant rather than as a keystroke, because that is what actually
+		// governs forward-Tab. Declared before the trigger — which is where the sheet used to
+		// live — Tab from More left the nav entirely and the rows were reachable only by
+		// shift-Tabbing back through all five links.
+		const root = render(MobileNavComponent, { nav: mobileNav(THORNHILL), pathname: '/' });
+		const trigger = moreTrigger(root);
+
+		trigger.click();
+		await Promise.resolve();
+
+		const sheetRow = root.querySelector<HTMLElement>('nav > div a');
+		expect(sheetRow, 'the sheet rendered no rows').not.toBeNull();
+
+		const position = trigger.compareDocumentPosition(sheetRow!);
+		expect(position & Node.DOCUMENT_POSITION_FOLLOWING, 'the sheet precedes its trigger').toBe(
+			Node.DOCUMENT_POSITION_FOLLOWING
+		);
+	});
+
+	it('returns focus to More when Escape closes the sheet', async () => {
+		// Everything inside the sheet is destroyed when it closes, so without an explicit
+		// restore the browser drops focus on <body> and the next Tab starts over from the top
+		// of the document.
+		const root = render(MobileNavComponent, { nav: mobileNav(THORNHILL), pathname: '/' });
+		const trigger = moreTrigger(root);
+
+		trigger.focus();
+		trigger.click();
+		await Promise.resolve();
+
+		await userEvent.keyboard('{Escape}');
+
+		expect(root.querySelector('nav > div')).toBeNull();
+		expect(document.activeElement).toBe(trigger);
 	});
 });
