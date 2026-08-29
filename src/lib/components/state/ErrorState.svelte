@@ -50,7 +50,18 @@
 	import EmptyState from './EmptyState.svelte';
 	import Refusal from './Refusal.svelte';
 
-	let { status, error }: { status: number; error: App.Error | null } = $props();
+	let {
+		status,
+		error,
+		/**
+		 * `1` by default here, unlike everywhere else this panel's geometry appears. On an error
+		 * boundary this panel IS the page: there is no route heading above it, because the route
+		 * that would have drawn one is the thing that threw. An `h2` alone in a document is a
+		 * level skip, so the two `+error.svelte` files take the top level and `LockedModule`,
+		 * `RemovedModule` and every list screen's `EmptyState` keep their `h2` under a real `h1`.
+		 */
+		headingLevel = 1
+	}: { status: number; error: App.Error | null; headingLevel?: 1 | 2 } = $props();
 
 	/**
 	 * The house sentence for a refusal that arrived with nothing in it. `ctx.ts` already says
@@ -90,7 +101,7 @@
 <!-- eslint-disable svelte/no-navigation-without-resolve -->
 
 {#if tone === 'calm'}
-	<EmptyState icon={Info} {heading} body={message}>
+	<EmptyState icon={Info} {heading} {headingLevel} body={message}>
 		{#snippet action()}
 			<Button {href} variant="secondary">
 				<ArrowLeft class="size-4" aria-hidden="true" />
@@ -103,7 +114,9 @@
 		data-slot="error-state"
 		class="flex flex-col items-start gap-2.5 rounded-[10px] border border-line-default bg-surface-card p-7"
 	>
-		<h2 class="text-[16px] leading-snug text-ink">{heading}</h2>
+		<svelte:element this={`h${headingLevel}`} class="text-[16px] leading-snug text-ink">
+			{heading}
+		</svelte:element>
 
 		<Refusal {message} class="w-full" />
 

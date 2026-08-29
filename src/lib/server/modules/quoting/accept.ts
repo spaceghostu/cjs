@@ -26,6 +26,7 @@ import { quote } from '$lib/server/core/db/schema/quoting';
 import { business as businessTable } from '$lib/server/core/db/schema/core';
 import { issuerFrom, priceQuote, quoteDocument } from '$lib/core/quoting';
 import type { PrintableDocument } from '$lib/core/document';
+import { notFoundMessage } from '$lib/core/refusals';
 import { toQuote } from '$lib/server/core/db/map';
 import { quoteLine } from '$lib/server/core/db/schema/quoting';
 import { recordEvent } from './events';
@@ -180,7 +181,7 @@ export async function answerSharedQuote(
 	});
 
 	if (!found || found.archivedAt !== null) {
-		return { ok: false, message: "We couldn't find that quote." };
+		return { ok: false, message: notFoundMessage('quote') };
 	}
 
 	if (hasExpired(found.validUntil, todayIn(now))) {

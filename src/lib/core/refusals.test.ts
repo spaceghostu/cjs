@@ -16,7 +16,7 @@
  *      locked module started rendering red.
  */
 import { describe, expect, it } from 'vitest';
-import { notFound, notFoundMessage, toneOf, type RefusalCode } from './refusals';
+import { notFound, notFoundMessage, toneOf, unhandledRefusal, type RefusalCode } from './refusals';
 
 /**
  * Every member of the union, with the tone it is expected to carry. Typed as a full `Record`
@@ -99,5 +99,53 @@ describe('tone', () => {
 	it('falls back on status alone when a throw carried no code', () => {
 		expect(toneOf(404)).toBe('calm');
 		expect(toneOf(403)).toBe('calm');
+	});
+});
+
+/**
+ * THE HOOK'S DECISION, WHICH IS MOSTLY ABOUT 404s AND NOT ABOUT CRASHES.
+ *
+ * `handleError` is documented as the hook for the throw nobody anticipated, but an unmatched URL
+ * raises a `SvelteKitError` rather than an `HttpError`, so it falls through to the same hook —
+ * which makes a mistyped address by far the most common thing that ever reaches it. Until this
+ * was pinned, every one of those rendered in the failure tint under the sentence "Something went
+ * wrong on our side. Nothing you did caused this.", which is untrue of a typo and is the exact
+ * inversion of rule 4 of the standard: a boundary renders calm.
+ */
+describe('a throw that reached the hook rather than a route', () => {
+	it('answers an unmatched address with the calm not-found sentence', () => {
+		const refusal = unhandledRefusal(404);
+		expect(refusal.code).toBe('not_found');
+		expect(refusal.message).toBe(notFoundMessage('page'));
+		expect(toneOf(404, refusal.code)).toBe('calm');
+	});
+
+	it.each([400, 403, 404, 405, 415, 429])(
+		'draws %i calm, because the router refused a request',
+		(status) => {
+			expect(toneOf(status, unhandledRefusal(status).code)).toBe('calm');
+		}
+	);
+
+	it.each([500, 502, 503])(
+		'keeps the unexpected shape at %i, where something really broke',
+		(status) => {
+			const refusal = unhandledRefusal(status);
+			expect(refusal.code).toBe('unexpected');
+			expect(refusal.message).toBe(
+				'Something went wrong on our side. Nothing you did caused this.'
+			);
+			expect(toneOf(status, refusal.code)).toBe('wrong');
+		}
+	);
+
+	it('never returns the cause — no status, no stack, no jargon — and always offers a way back', () => {
+		for (const status of [404, 500]) {
+			const refusal = unhandledRefusal(status);
+			expect(refusal.message).not.toMatch(/\b(error|stack|internal|exception|null|undefined)\b/i);
+			expect(refusal.message).not.toMatch(String(status));
+			expect(refusal.nextHref).toBe('/');
+			expect(refusal.nextLabel).toBe('Back to your dashboard');
+		}
 	});
 });

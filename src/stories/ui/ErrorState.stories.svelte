@@ -60,6 +60,13 @@
 
 	A reviewer can see the whole decision at a glance here, and the two Storybook projects assert
 	every one of these in light and in dark without anybody switching a theme by hand.
+
+	`headingLevel={2}` on every specimen below, which is the ONE thing here that is not what the
+	product renders. On a real error page this panel is the whole document and its heading is the
+	`h1`; inside a `Specimen` it sits under the specimen's own title, and an `h1` beneath an `h2`
+	is a heading-order violation that the a11y addon fails the run on — correctly, because in
+	THIS document it would be one. The tag is the only difference; the copy, the tone dispatch
+	and the geometry are the shipped ones.
 -->
 <Story name="Module never added" asChild>
 	<Specimen
@@ -67,7 +74,7 @@
 		note="Calm. NOT ENTITLED IS NOT AN ERROR — the component is named for where it mounts, never for what it says, and the tone comes from toneOf() rather than from the call site."
 		surface="base"
 	>
-		<div class="max-w-2xl"><ErrorState status={403} error={LOCKED} /></div>
+		<div class="max-w-2xl"><ErrorState status={403} error={LOCKED} headingLevel={2} /></div>
 	</Specimen>
 </Story>
 
@@ -77,7 +84,7 @@
 		note="Also calm, and for a stronger reason: the data is still there, still readable and still exportable. Drawing this as a failure would be simply untrue."
 		surface="base"
 	>
-		<div class="max-w-2xl"><ErrorState status={403} error={REMOVED} /></div>
+		<div class="max-w-2xl"><ErrorState status={403} error={REMOVED} headingLevel={2} /></div>
 	</Specimen>
 </Story>
 
@@ -87,7 +94,7 @@
 		note="The reason and the way round it are in the same sentence. A refusal that said only 'forbidden' would leave somebody to guess which of the two it was."
 		surface="base"
 	>
-		<div class="max-w-2xl"><ErrorState status={403} error={NOT_OWNER} /></div>
+		<div class="max-w-2xl"><ErrorState status={403} error={NOT_OWNER} headingLevel={2} /></div>
 	</Specimen>
 </Story>
 
@@ -97,7 +104,7 @@
 		note="One sentence, from notFound(), naming no id, no owner and no reason — because a record that exists and one that does not have to be indistinguishable to somebody guessing at URLs."
 		surface="base"
 	>
-		<div class="max-w-2xl"><ErrorState status={404} error={MISSING} /></div>
+		<div class="max-w-2xl"><ErrorState status={404} error={MISSING} headingLevel={2} /></div>
 	</Specimen>
 </Story>
 
@@ -107,6 +114,6 @@
 		note="The one story that wears the tint. The cause was logged with the request id; what reaches the person is the house sentence, never the exception's own words."
 		surface="base"
 	>
-		<div class="max-w-2xl"><ErrorState status={500} error={BROKEN} /></div>
+		<div class="max-w-2xl"><ErrorState status={500} error={BROKEN} headingLevel={2} /></div>
 	</Specimen>
 </Story>

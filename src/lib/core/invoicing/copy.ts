@@ -265,11 +265,17 @@ export function openCountPhrase(count: number): string {
  *
  * The screen branches on the COUNTS to tell them apart, never on the visible rows and never on
  * which tab is showing — `InvoiceList` did the latter until SPA-13, which got it wrong in both
- * directions at once.
+ * directions at once. *
+ * THE `'all'` STRING IS THE BODY OF A PANEL THAT ALREADY HAS A HEADING, and it is written to sit
+ * UNDER one rather than to open with the same words. `EmptyState` renders "Nothing invoiced yet" above it, and a
+ * body that began by repeating that would be the interface saying the same thing twice to fill a
+ * slot — the thing `$lib/components/state/ErrorState.svelte` states as a rule for the layer
+ * these panels belong to. The other branches are `NoMatches` messages, which have no heading
+ * above them and therefore have to carry their own subject.
  */
 export function emptyCopy(filter: InvoiceFilter): string {
 	if (filter === 'all') {
-		return 'Nothing invoiced yet. Start one and it will save as you go — you can close it and come back.';
+		return 'Start one and it will save as you go — you can close it and come back.';
 	}
 	return 'Nothing here. That is usually good news.';
 }

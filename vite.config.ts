@@ -44,7 +44,13 @@ export default defineConfig({
 					name: 'unit',
 					environment: 'node',
 					include: ['src/**/*.{test,spec}.{js,ts}', 'src/**/*.svelte.{test,spec}.{js,ts}'],
-					exclude: ['src/**/*.stories.*', 'src/**/*.mobile.spec.ts']
+					exclude: ['src/**/*.stories.*', 'src/**/*.mobile.spec.ts'],
+					// A large part of this project asserts Row Level Security, and every one of
+					// those assertions is worth nothing if the connection can bypass a policy.
+					// The setup file proves it cannot, once per worker, before any suite runs —
+					// see scripts/vitest-setup.ts for why the default state of an unconfigured
+					// checkout gets this wrong and what to do about it.
+					setupFiles: [path.join(dirname, 'scripts/vitest-setup.ts')]
 				}
 			},
 			{

@@ -11,6 +11,7 @@ import { business as businessTable, member as memberTable } from '$lib/server/co
 import { toBusiness, toMember } from '$lib/server/core/db/map';
 import { loadMemberships, selectMembership } from '$lib/server/core/ctx';
 import { loadAccess } from '$lib/server/core/entitlement';
+import { unhandledRefusal } from '$lib/core/refusals';
 
 /**
  * Boot checks. `src/lib/server/env.ts` validates every secret the moment it is imported;
@@ -139,7 +140,7 @@ const handleGuard: Handle = async ({ event, resolve }) => {
 };
 
 /**
- * THE THROW NOBODY ANTICIPATED.
+ * THE THROW NOBODY ANTICIPATED — AND THE ADDRESS THAT NEVER EXISTED, WHICH ARRIVES HERE TOO.
  *
  * Every deliberate refusal in this product goes through `error()` with an `App.Error` written
  * for the person reading it. This hook is for the other kind: a driver that went away
@@ -158,22 +159,34 @@ const handleGuard: Handle = async ({ event, resolve }) => {
  * would be both frightening and useless to the person it reached, and on a shared error surface
  * it is also how internals leak.
  *
- * The code is `unexpected` rather than `no_request_context`: that one names ONE specific `ctx`
- * invariant, and overloading it to also mean "anything at all" would make the logs unreadable.
- * The sentence is deliberately the same one, because it is the right sentence for both.
+ * WHAT ARRIVES HERE IS NOT ALL ONE KIND OF THING, and that is why this hook branches rather than
+ * answering everything the same way. SvelteKit does not route an unmatched URL to a 404 page: it
+ * raises a `SvelteKitError`, and only an `HttpError` — the shape `error()` throws — short-circuits
+ * before this hook. So every mistyped address, dead bookmark, bot walking a wordlist and browser
+ * asking for a favicon that is not there lands in this function, and it is by a wide margin the
+ * most common thing that will ever run through it. Answering those with "Something went wrong on
+ * our side" would tell somebody the product had broken when all they did was mistype a URL.
+ *
+ * The decision is `unhandledRefusal()` in `$lib/core/refusals`, which is pure and asserted in
+ * `refusals.test.ts` for the same reason `toneOf` is: this is a rule about what the product says,
+ * not a habit of one hook. Below 500 it is the router refusing a request, and it renders calm
+ * with a way back; at 500 and above something genuinely broke, and the `unexpected` shape stands.
+ *
+ * AND THE LOG FOLLOWS THE SAME LINE. A 404 is a routine fact of having a public URL space, not an
+ * incident: logging a nine-frame stack for each one would bury the genuine 500s under favicon
+ * probes and scanner traffic, which is the failure mode where a log stops being read at all. The
+ * refusal is still returned and rendered — nothing is swallowed — it is simply not reported as a
+ * fault, because it is not one.
  */
 export const handleError: HandleServerError = ({ error, event, status, message }) => {
-	console.error(
-		`[${event.locals?.requestId ?? 'no-request-id'}] ${status} ${message} at ${event.url.pathname}`,
-		error
-	);
+	if (status >= 500) {
+		console.error(
+			`[${event.locals?.requestId ?? 'no-request-id'}] ${status} ${message} at ${event.url.pathname}`,
+			error
+		);
+	}
 
-	return {
-		code: 'unexpected',
-		message: 'Something went wrong on our side. Nothing you did caused this.',
-		nextHref: '/',
-		nextLabel: 'Back to your dashboard'
-	};
+	return unhandledRefusal(status);
 };
 
 export const handle: Handle = sequence(handleIdentity, handleBusiness, handleGuard);

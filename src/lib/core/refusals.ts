@@ -73,12 +73,23 @@ export type RefusalCode =
 /**
  * The not-found sentence, as a plain string.
  *
- * It exists separately from `notFound()` because one call site cannot use an `App.Error` at
- * all: the `makeInvoice` action in `src/routes/(app)/quoting/[id]/+page.server.ts` throws a
- * `CannotSendQuote` rather than calling `error(404)`, for the reason its own comment gives —
- * a thrown redirect or error inside that try would be swallowed by the catch below it and
- * re-reported as a 500. It surfaces the sentence through `fail(422, { message })` instead. So
- * that site consumes the string, this file owns the string, and the two cannot drift.
+ * It exists separately from `notFound()` because MOST of the places that say this sentence
+ * cannot use an `App.Error` at all. Two shapes of call site need the bare string:
+ *
+ *   - `makeInvoice` in `src/routes/(app)/quoting/[id]/+page.server.ts`, which throws a
+ *     `CannotSendQuote` rather than calling `error(404)`, for the reason its own comment gives:
+ *     a thrown redirect or error inside that try would be swallowed by the catch below it and
+ *     re-reported as a 500. It surfaces the sentence through `fail(422, { message })` instead.
+ *
+ *   - the seventeen ACTION and EFFECT paths across quoting, invoicing and inventory, which
+ *     refuse by throwing a module's own `CannotDoThat` / `CannotIssueInvoice` /
+ *     `CannotSendQuote` and are caught by the action that called them and rendered as a banner
+ *     beside the work. Those never reach an error boundary, so an `App.Error` would be a shape
+ *     nothing there consumes — but the SENTENCE has to be the same sentence, which is the
+ *     entire point.
+ *
+ * Every one of them consumes the string from here. This file owns it, and none of them can
+ * drift from the page-load refusals by a word.
  */
 export function notFoundMessage(thing: string): string {
 	return `We couldn't find that ${thing}.`;
@@ -96,11 +107,21 @@ export function notFoundMessage(thing: string): string {
  * second query that could tell the two apart without deliberately reaching around RLS, and
  * nothing in this product should ever want to.
  *
- * This function is the one place the sentence is written, so that no route can accidentally
- * write a second one that differs by a word and, in differing, confirms that the record exists.
- * The sentence names no id, no owner, and no reason. `src/routes/(app)/not-found.test.ts` proves
- * the property the only way it can be proved: a rival tenant's REAL committed record and a
- * random UUID must produce a byte-identical refusal, across every tenant-scoped id route.
+ * `notFoundMessage()` above is the one place the sentence is written, and this function is the
+ * one place it is wrapped in the shape an error boundary renders — so that no route can
+ * accidentally write a second one that differs by a word and, in differing, confirms that the
+ * record exists. The sentence names no id, no owner, and no reason.
+ * `src/routes/(app)/not-found.test.ts` proves the property the only way it can be proved: a
+ * rival tenant's REAL committed record and a random UUID must produce a byte-identical refusal,
+ * across every tenant-scoped id route, and across the document PDF route where it matters most.
+ *
+ * THE ONE DELIBERATE VARIANT, so that a later reader does not "fix" it: `archiveItem` in
+ * `src/lib/server/modules/inventory/effects.ts` says "We couldn't find that item, or it is
+ * already archived." Its UPDATE carries `is null` on `archived_at` as well as the id, so a row
+ * that IS this tenant's and IS already archived reaches the same zero-rows branch as one that
+ * was never there. Saying only "we couldn't find that item" to somebody looking straight at the
+ * item would be untrue, and the disjunction leaks nothing: both halves are facts about a row
+ * this tenant can already see.
  *
  * DELIBERATELY NOT FOLDED IN HERE: the token routes. `/q/[token]` and `/i/[token]` keep their
  * own, longer sentences — "This link doesn't open a quote. It may have been withdrawn, or the
@@ -167,4 +188,54 @@ export function toneOf(status: number, code?: RefusalCode): 'calm' | 'wrong' {
 		default:
 			return status >= 500 ? 'wrong' : 'calm';
 	}
+}
+
+/**
+ * WHAT `handleError` SAYS, DECIDED FROM THE STATUS IT WAS HANDED.
+ *
+ * `hooks.server.ts`'s `handleError` is documented as the hook for THE THROW NOBODY
+ * ANTICIPATED, and that is most of what reaches it — a driver that went away mid-transaction,
+ * a null nobody guarded, a bug. But it is not all of it, and the exception is the single most
+ * common thing that will ever run through this function.
+ *
+ * SvelteKit does not route an unmatched URL to a 404 page. It raises a `SvelteKitError`, and
+ * `handle_error_and_jsonify` short-circuits only for `HttpError` — the shape `error()` throws.
+ * A `SvelteKitError` falls straight through to this hook. So every mistyped address, every dead
+ * bookmark, every bot walking a wordlist and every browser asking for a favicon that is not
+ * there arrives here, and a hook that answered all of them with "Something went wrong on our
+ * side" would be telling somebody the product had broken when all they did was mistype a URL.
+ * That is the exact inversion of rule 4 of the standard in `$lib/components/state/index.ts` —
+ * a boundary is not a breakage — and it would also make `toneOf`'s status-only fallback dead
+ * for the one case its own comment names.
+ *
+ * SO THE STATUS DECIDES, and it is a fair judge here because the two halves are genuinely
+ * different kinds of event rather than two shades of one.
+ *
+ * BELOW 500 the throw came from the router, and the router only ever refuses the REQUEST: no
+ * such address (404), an address that would not decode (400), a form POST to a page that has no
+ * actions or sends a body it does not take (405, 415). Not one of those is a failure of the
+ * product, and every one of them is honestly summarised by the sentence this file already owns
+ * for "it is not there". They render calm, with a way back, which is what somebody who mistyped
+ * a URL actually needs.
+ *
+ * AT 500 AND ABOVE something really did break, and the `unexpected` shape stands: the cause is
+ * logged with the request id, and the person is told a sentence written for them rather than a
+ * constraint name or a stack frame.
+ *
+ * RETURNING NOTHING WAS THE OTHER OPTION AND IT IS WORSE. SvelteKit then fills `App.Error` with
+ * `{ message }`, and for an unmatched route that message is the two words "Not Found" — a
+ * sentence written for a developer landing on a user's screen, which is the prohibition
+ * `$lib/core/validation` states as a rule.
+ */
+export function unhandledRefusal(status: number): App.Error {
+	if (status >= 500) {
+		return {
+			code: 'unexpected',
+			message: 'Something went wrong on our side. Nothing you did caused this.',
+			nextHref: '/',
+			nextLabel: 'Back to your dashboard'
+		};
+	}
+
+	return notFound('page');
 }

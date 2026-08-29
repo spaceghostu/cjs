@@ -25,6 +25,12 @@
 	 * MARGIN-FREE. The spacing belongs to the caller, exactly as it does for `LockedModule` and
 	 * `RemovedModule` — which is the only reason those two compose into four different page
 	 * containers without a variant prop. Every list screen passes `class="mt-8"`.
+	 *
+	 * AND THE HEADING LEVEL BELONGS TO THE CALLER TOO, for the same reason the margin does. On a
+	 * list screen this panel sits under the page's own `<h1>` and `h2` is correct. On the two
+	 * `+error.svelte` files it is the ONLY heading the document has, and an `h2` with no `h1`
+	 * above it is a level skip — the whole page announcing itself as a subsection of nothing. So
+	 * the level is a prop rather than a fact of the component, defaulting to the common case.
 	 */
 	import type { Snippet } from 'svelte';
 	import type { LucideIcon } from '@lucide/svelte';
@@ -32,6 +38,7 @@
 
 	let {
 		heading,
+		headingLevel = 2,
 		body,
 		/** A lucide icon, drawn in `accentClass` — the module's own colour, never a state colour. */
 		icon: Icon,
@@ -40,6 +47,8 @@
 		class: className
 	}: {
 		heading: string;
+		/** `1` when this panel IS the page, as on an error boundary. `2` under a page's own h1. */
+		headingLevel?: 1 | 2;
 		body: string;
 		icon?: LucideIcon;
 		accentClass?: string;
@@ -59,7 +68,9 @@
 		<Icon size={22} strokeWidth={1.75} class={accentClass} aria-hidden="true" />
 	{/if}
 
-	<h2 class="text-[16px] leading-snug text-ink">{heading}</h2>
+	<svelte:element this={`h${headingLevel}`} class="text-[16px] leading-snug text-ink">
+		{heading}
+	</svelte:element>
 
 	<p class="max-w-95 text-[13px] leading-relaxed text-ink-secondary">{body}</p>
 

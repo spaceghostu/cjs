@@ -58,6 +58,7 @@ import {
 	type TestUser
 } from '$lib/server/core/db/fixtures';
 import { NO_ACCESS, type AccessMap } from '$lib/server/core/ctx';
+import { notFoundMessage } from '$lib/core/refusals';
 import { business as businessTable } from '$lib/server/core/db/schema/core';
 import { toBusiness } from '$lib/server/core/db/map';
 import { createDraft as createQuoteDraft } from '$lib/server/modules/quoting/effects';
@@ -68,7 +69,9 @@ import { load as loadQuotePage, actions as quoteActions } from './quoting/[id]/+
 import { load as loadInvoicePage } from './invoicing/[id]/+page.server';
 import { load as loadItemPage } from './inventory/[id]/+page.server';
 import { load as loadCountPage } from './inventory/counts/[id]/+page.server';
+import { load as loadWorkingsPage } from './invoicing/[id]/workings/+page.server';
 import { GET as getDocumentPdf } from './documents/[id]/pdf/+server';
+import { POST as saveCountSheet } from './inventory/counts/[id]/save/+server';
 
 /**
  * Generous, because teardown is a delete across two dozen tables per business against a remote
@@ -189,6 +192,23 @@ function requestFor<E>(locals: Partial<App.Locals>, pathname: string, id: string
 }
 
 /**
+ * The same, for the one endpoint under test that reads a JSON body rather than a form. The body
+ * is a valid, EMPTY patch on purpose: `parseCountPatch` refuses a malformed one with a 422
+ * before the route ever looks the count up, and a 422 is not the refusal this file is about.
+ */
+function jsonRequestFor<E>(locals: Partial<App.Locals>, pathname: string, id: string): E {
+	return {
+		...eventFor(locals, pathname),
+		params: { id },
+		request: new Request(`http://localhost:5173${pathname}`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ lines: [] })
+		})
+	} as unknown as E;
+}
+
+/**
  * Runs something that must be refused, and hands back what it threw. Takes `unknown` rather
  * than a promise because a SvelteKit `load` is declared `MaybePromise`, and `await` settles the
  * difference for both shapes.
@@ -205,13 +225,21 @@ async function refusalFrom(run: () => unknown): Promise<unknown> {
 /**
  * The whole property, in one assertion pair. Both calls must be HTTP errors before either body
  * is looked at, and then they must agree completely — status and body, not merely tone.
+ *
+ * IT ALSO PINS WHAT THEY AGREED ON, and that half is not decoration. "The two answers match" is
+ * satisfied by ANY shared refusal: a route that had lost its entitlement, or one that started
+ * refusing everybody, would go on satisfying it forever while proving nothing about tenancy. So
+ * the pair has to be the right answer as well as the same answer — a 404, carrying the sentence
+ * `notFoundMessage()` owns for the thing that route was asked for.
  */
-function assertIndistinguishable(forReal: unknown, forNothing: unknown): void {
+function assertIndistinguishable(forReal: unknown, forNothing: unknown, thing: string): void {
 	expect(isHttpError(forReal)).toBe(true);
 	expect(isHttpError(forNothing)).toBe(true);
 	if (!isHttpError(forReal) || !isHttpError(forNothing)) return;
 
+	expect(forReal.status).toBe(404);
 	expect(forReal.status).toBe(forNothing.status);
+	expect(forReal.body.message).toBe(notFoundMessage(thing));
 	expect(forReal.body).toEqual(forNothing.body);
 	expect(forReal.body.message).not.toMatch(LEAKS);
 }
@@ -271,6 +299,45 @@ describe('the fixture itself', () => {
 			)
 		).toBeTruthy();
 	}, 30_000);
+
+	/**
+	 * THE PDF ROUTE NEEDS ITS OWN CONTROL, and it needs it more than the four loads above do.
+	 *
+	 * Its refusal is reached through a loop that SKIPS any module whose access is `none`, so a
+	 * route that had stopped answering ANYBODY — a narrowed `OWNED`, an edited resolver list, a
+	 * renderer that threw — would go on satisfying "both answers match" forever, on the one route
+	 * in this file whose success path returns another business's priced document on their own
+	 * letterhead. Two identical 404s prove tenancy only once somebody has shown that a 200 was
+	 * ever possible.
+	 *
+	 * Both ids, because a quote and an invoice take different paths through that resolver loop.
+	 */
+	it('renders the rival its own quote and invoice as PDF bytes', async () => {
+		for (const id of [rival.quoteId, rival.invoiceId]) {
+			const response = await getDocumentPdf(requestFor(rival.locals, `/documents/${id}/pdf`, id));
+			expect(response.status).toBe(200);
+			expect(response.headers.get('content-type')).toBe('application/pdf');
+		}
+	}, 120_000);
+
+	/**
+	 * And the same for the two routes whose refusals are asserted furthest down. The count
+	 * sheet's autosave endpoint answers with JSON rather than a page, and the workings page
+	 * folds a SECOND cause — an archived invoice — into the same 404, so "it refused" is not on
+	 * its own evidence that the tenancy branch is the one that fired.
+	 */
+	it('saves the rival its own count sheet, and shows it its own workings', async () => {
+		const saved = await saveCountSheet(
+			jsonRequestFor(rival.locals, `/inventory/counts/${rival.countId}/save`, rival.countId)
+		);
+		expect(saved.status).toBe(200);
+
+		expect(
+			await loadWorkingsPage(
+				requestFor(rival.locals, `/invoicing/${rival.invoiceId}/workings`, rival.invoiceId)
+			)
+		).toBeTruthy();
+	}, 60_000);
 });
 
 describe('a tenant-scoped id that is not this tenant’s', () => {
@@ -282,7 +349,8 @@ describe('a tenant-scoped id that is not this tenant’s', () => {
 			),
 			await refusalFrom(() =>
 				loadQuotePage(requestFor(thornhill.locals, `/quoting/${nothing}`, nothing))
-			)
+			),
+			'quote'
 		);
 	}, 30_000);
 
@@ -296,7 +364,8 @@ describe('a tenant-scoped id that is not this tenant’s', () => {
 			),
 			await refusalFrom(() =>
 				loadInvoicePage(requestFor(thornhill.locals, `/invoicing/${nothing}`, nothing))
-			)
+			),
+			'invoice'
 		);
 	}, 30_000);
 
@@ -308,7 +377,8 @@ describe('a tenant-scoped id that is not this tenant’s', () => {
 			),
 			await refusalFrom(() =>
 				loadItemPage(requestFor(thornhill.locals, `/inventory/${nothing}`, nothing))
-			)
+			),
+			'item'
 		);
 	}, 30_000);
 
@@ -322,7 +392,8 @@ describe('a tenant-scoped id that is not this tenant’s', () => {
 			),
 			await refusalFrom(() =>
 				loadCountPage(requestFor(thornhill.locals, `/inventory/counts/${nothing}`, nothing))
-			)
+			),
+			'stock count'
 		);
 	}, 30_000);
 });
@@ -347,7 +418,8 @@ describe('the shared document PDF route', () => {
 			),
 			await refusalFrom(() =>
 				getDocumentPdf(requestFor(thornhill.locals, `/documents/${nothing}/pdf`, nothing))
-			)
+			),
+			'document'
 		);
 	}, 30_000);
 
@@ -361,7 +433,57 @@ describe('the shared document PDF route', () => {
 			),
 			await refusalFrom(() =>
 				getDocumentPdf(requestFor(thornhill.locals, `/documents/${nothing}/pdf`, nothing))
-			)
+			),
+			'document'
+		);
+	}, 30_000);
+});
+
+/**
+ * THE TWO ROUTES THAT ARE NOT PAGE LOADS AND NOT THE PDF.
+ *
+ * They inherit the property by construction — the same helper, after the same RLS-filtered load
+ * — but "by construction" is what every one of the seven refusals in this file was before it was
+ * asserted, and these two are the ones a later edit is most likely to reach for. The count
+ * sheet's autosave endpoint is the only tenant-scoped refusal in the product that is READ BY A
+ * MACHINE rather than rendered: the sheet parses its JSON body, so a route that started saying
+ * something else there would drift without a screen to show it.
+ *
+ * The workings page is the more interesting of the two, because it folds a SECOND cause into the
+ * same refusal: `!header || header.archivedAt !== null`. A tenant's own archived invoice and
+ * another tenant's live one have to be one answer as well, and that is only true while both go
+ * through `notFound('invoice')`.
+ */
+describe('the count sheet endpoint and the workings page', () => {
+	it('refuses a save to a count sheet that is not this tenant’s, identically', async () => {
+		const nothing = randomUUID();
+		assertIndistinguishable(
+			await refusalFrom(() =>
+				saveCountSheet(
+					jsonRequestFor(thornhill.locals, `/inventory/counts/${rival.countId}/save`, rival.countId)
+				)
+			),
+			await refusalFrom(() =>
+				saveCountSheet(
+					jsonRequestFor(thornhill.locals, `/inventory/counts/${nothing}/save`, nothing)
+				)
+			),
+			'stock count'
+		);
+	}, 30_000);
+
+	it('refuses the workings of an invoice that is not this tenant’s, identically', async () => {
+		const nothing = randomUUID();
+		assertIndistinguishable(
+			await refusalFrom(() =>
+				loadWorkingsPage(
+					requestFor(thornhill.locals, `/invoicing/${rival.invoiceId}/workings`, rival.invoiceId)
+				)
+			),
+			await refusalFrom(() =>
+				loadWorkingsPage(requestFor(thornhill.locals, `/invoicing/${nothing}/workings`, nothing))
+			),
+			'invoice'
 		);
 	}, 30_000);
 });
@@ -392,6 +514,12 @@ describe('raising an invoice from a quote that is not this tenant’s', () => {
 		expect(forReal.status).toBe(422);
 		expect(forReal.status).toBe(forNothing.status);
 		expect(forReal.data).toEqual(forNothing.data);
-		expect((forReal.data as unknown as { message: string }).message).not.toMatch(LEAKS);
+
+		// Pinned to the exact sentence for the same reason `assertIndistinguishable` is: two
+		// failures that merely AGREE could agree on anything, and the whole point of this call
+		// site is that a `fail(422)` and an `error(404)` say the one sentence between them.
+		const said = (forReal.data as unknown as { message: string }).message;
+		expect(said).toBe(notFoundMessage('quote'));
+		expect(said).not.toMatch(LEAKS);
 	}, 30_000);
 });

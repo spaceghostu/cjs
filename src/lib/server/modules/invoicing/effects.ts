@@ -17,6 +17,7 @@
  */
 import { and, eq, isNull, notInArray, sql } from 'drizzle-orm';
 import { VAT_POLICY, type Money } from '$lib/core/money';
+import { notFoundMessage } from '$lib/core/refusals';
 import { STANDARD_VAT_RATE_PPM } from '$lib/core/quoting';
 import { addDays, todayIn, type CalendarDate } from '$lib/core/calendar';
 import {
@@ -228,7 +229,7 @@ export async function duplicateInvoice(
 	const { now = new Date() } = options;
 
 	const source = await loadInvoiceRow(tx, invoiceId);
-	if (!source) throw new CannotDoThat("We couldn't find that invoice.");
+	if (!source) throw new CannotDoThat(notFoundMessage('invoice'));
 
 	const settings = await loadSettings(tx);
 	const today = todayIn(now);
@@ -483,7 +484,7 @@ export async function recordPayment(
 	now: Date = new Date()
 ): Promise<{ readonly settled: boolean; readonly outstanding: Money }> {
 	const header = await loadInvoiceRow(tx, invoiceId);
-	if (!header) throw new CannotDoThat("We couldn't find that invoice.");
+	if (!header) throw new CannotDoThat(notFoundMessage('invoice'));
 
 	if (header.status === 'draft') {
 		throw new CannotDoThat('That invoice has not been issued yet, so nothing is owed on it.');
@@ -561,11 +562,11 @@ export async function reversePayment(
 	now: Date = new Date()
 ): Promise<{ readonly settled: boolean; readonly outstanding: Money }> {
 	const header = await loadInvoiceRow(tx, invoiceId);
-	if (!header) throw new CannotDoThat("We couldn't find that invoice.");
+	if (!header) throw new CannotDoThat(notFoundMessage('invoice'));
 
 	const payments = await loadPayments(tx, invoiceId);
 	const original = payments.find((p) => p.id === paymentId);
-	if (!original) throw new CannotDoThat("We couldn't find that payment.");
+	if (!original) throw new CannotDoThat(notFoundMessage('payment'));
 
 	const alreadyReversed = payments.some((p) => p.reversesPaymentId === paymentId);
 	const verdict = canReverse(original, alreadyReversed, now);
@@ -661,7 +662,7 @@ export async function cancelInvoice(
 	now: Date = new Date()
 ): Promise<void> {
 	const header = await loadInvoiceRow(tx, invoiceId);
-	if (!header) throw new CannotDoThat("We couldn't find that invoice.");
+	if (!header) throw new CannotDoThat(notFoundMessage('invoice'));
 
 	if (header.status === 'draft') {
 		throw new CannotDoThat(

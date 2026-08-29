@@ -31,6 +31,7 @@ import {
 import { allocateDocumentNumber } from '$lib/server/core/db/numbering';
 import { todayIn, type CalendarDate } from '$lib/core/calendar';
 import { ZAR, type Money } from '$lib/core/money';
+import { notFoundMessage } from '$lib/core/refusals';
 import {
 	netValueEffect,
 	varyingLines,
@@ -257,7 +258,7 @@ export async function saveCountLine(
 		.where(eq(stockCountLine.id, lineId))
 		.returning({ id: stockCountLine.id });
 
-	if (updated.length === 0) throw new CannotDoThat("We couldn't find that count line.");
+	if (updated.length === 0) throw new CannotDoThat(notFoundMessage('count line'));
 }
 
 /**
@@ -285,7 +286,7 @@ async function moveTo(
 	to: 'counting' | 'reviewing'
 ): Promise<void> {
 	const header = await loadStockCount(tx, countId);
-	if (!header) throw new CannotDoThat("We couldn't find that stock count.");
+	if (!header) throw new CannotDoThat(notFoundMessage('stock count'));
 
 	if (header.status === 'applied') {
 		throw new CannotDoThat('That stock count has already been applied to your stock.');
@@ -344,7 +345,7 @@ function toDomainLines(rows: Awaited<ReturnType<typeof loadStockCountLines>>): S
  */
 export async function reviewCount(tx: Tx, countId: string): Promise<CountReview> {
 	const header = await loadStockCount(tx, countId);
-	if (!header) throw new CannotDoThat("We couldn't find that stock count.");
+	if (!header) throw new CannotDoThat(notFoundMessage('stock count'));
 
 	const rows = await loadStockCountLines(tx, countId);
 	const lines = toDomainLines(rows);
@@ -386,7 +387,7 @@ export async function applyCount(
 	now: Date = new Date()
 ): Promise<{ movements: number; net: Money }> {
 	const header = await loadStockCount(tx, countId);
-	if (!header) throw new CannotDoThat("We couldn't find that stock count.");
+	if (!header) throw new CannotDoThat(notFoundMessage('stock count'));
 
 	if (header.status === 'applied') {
 		throw new CannotDoThat('That stock count has already been applied to your stock.');

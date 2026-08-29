@@ -27,7 +27,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { withModule } from '$lib/server/core/ctx';
 import { countTitle, stepOfStatus, triageCount, type CountSheetRow } from '$lib/core/inventory';
-import { notFound } from '$lib/core/refusals';
+import { notFound, notFoundMessage } from '$lib/core/refusals';
 import { loadStockCount, loadStockCountLines } from '$lib/server/modules/inventory/queries';
 import { CannotDoThat } from '$lib/server/modules/inventory/effects';
 import {
@@ -144,7 +144,7 @@ export const actions: Actions = {
 		try {
 			await withModule(event, 'inventory', 'write', async (ctx) => {
 				const header = await loadStockCount(ctx.tx, event.params.id);
-				if (!header) throw new CannotDoThat("We couldn't find that stock count.");
+				if (!header) throw new CannotDoThat(notFoundMessage('stock count'));
 
 				// THE STEP-3 GATE, and it is this application's rather than the database's.
 				// `app.freeze_applied_count()` permits `counting -> applied`, because its job is to
