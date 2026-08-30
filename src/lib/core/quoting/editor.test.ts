@@ -6,9 +6,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import { percent, quantity, unitPrice } from '$lib/core/money/ctor';
-import { ZAR } from '$lib/core/money';
+import { ZAR, parseUnitPriceInput } from '$lib/core/money';
 import {
 	blankLine,
+	lineFromItem,
 	blockersToSending,
 	depositIssue,
 	differencesFromRecord,
@@ -241,5 +242,80 @@ describe('what differs from the address book', () => {
 		expect(differencesFromRecord(state, record)).toEqual([
 			{ field: 'contactPerson', label: 'Contact person', was: 'Renske Malan', now: null }
 		]);
+	});
+});
+
+describe('a line picked from Inventory', () => {
+	/**
+	 * The pick is a SNAPSHOT, not a link. Everything the item contributes is copied onto the
+	 * line at this moment — repricing the item later must not touch a quote already made,
+	 * which is the guarantee the FK-less `sourceItemId` column exists to keep.
+	 */
+	const oak = {
+		id: '0b95e7b4-1111-4222-8333-444455556666',
+		name: 'European oak, 40mm',
+		unitOfMeasure: 'board',
+		sellPrice: unitPrice(1_780_000_000, ZAR)
+	};
+
+	it('copies the name, remembers the item, and starts at one', () => {
+		const line = lineFromItem(oak, 'fresh-id');
+
+		expect(line.id).toBe('fresh-id');
+		expect(line.description).toBe('European oak, 40mm');
+		expect(line.sourceItemId).toBe(oak.id);
+		expect(line.qty).toBe('1');
+		expect(line.taxTreatment).toBe('standard');
+	});
+
+	it('leaves the client-facing description alone', () => {
+		// `documentDescription` prints verbatim on the client's document and no quoting
+		// surface can edit or clear it — so nothing third-hand is ever copied into it.
+		expect(lineFromItem(oak, 'l1').documentDescription).toBeNull();
+	});
+
+	it('prefills the price the way the field convention writes one', () => {
+		// No thousands grouping: the field convention `editorFromQuote` already uses.
+		const line = lineFromItem(oak, 'l1');
+		expect(line.unitPrice).toBe('1780');
+
+		// And what the field shows parses back to the exact micros that were snapshotted.
+		const parsed = parseUnitPriceInput(line.unitPrice);
+		expect(parsed.ok && parsed.value.micros).toBe(1_780_000_000);
+	});
+
+	it('leaves the price empty when the item has none — and when it is zero', () => {
+		// "We have not recorded what this sells for" is not zero, and a zero sell price is
+		// not a price worth prefilling either. The person types the real one.
+		expect(lineFromItem({ ...oak, sellPrice: null }, 'l1').unitPrice).toBe('');
+		expect(lineFromItem({ ...oak, sellPrice: unitPrice(0, ZAR) }, 'l1').unitPrice).toBe('');
+	});
+
+	it('says where the line came from, and what one of it is', () => {
+		// A quote line has no unit column, so "per board" travels in the provenance text —
+		// without it, a per-board price on a line quantified in boards is ambiguous.
+		expect(lineFromItem(oak, 'l1').provenance).toBe(
+			'From Inventory · European oak, 40mm · per board'
+		);
+	});
+
+	it('drops the unit suffix when a unit is the unremarkable one', () => {
+		const hinge = { ...oak, name: 'Hinge pair', unitOfMeasure: 'each' };
+		expect(lineFromItem(hinge, 'l1').provenance).toBe('From Inventory · Hinge pair');
+	});
+
+	it('survives the autosave payload with its provenance intact', () => {
+		const quote = baseQuote();
+		const state = editorFromQuote(quote);
+		state.lines = [...state.lines, lineFromItem(oak, 'picked-1')];
+
+		const patch = patchFromEditor(state);
+		const sent = patch.lines.find((l) => l.id === 'picked-1');
+
+		// A picked line has a description, so it is not filtered out as an empty row.
+		expect(sent).toBeDefined();
+		expect(sent?.sourceItemId).toBe(oak.id);
+		expect(sent?.unitPriceMicros).toBe(1_780_000_000);
+		expect(sent?.provenance).toBe('From Inventory · European oak, 40mm · per board');
 	});
 });

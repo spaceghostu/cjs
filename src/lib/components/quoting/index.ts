@@ -7,6 +7,7 @@
  */
 export { default as QuoteEditor } from './QuoteEditor.svelte';
 export { default as EditorHeader } from './EditorHeader.svelte';
+export { default as InventoryPicker } from './InventoryPicker.svelte';
 export { default as LineTable } from './LineTable.svelte';
 export { default as PreviewPane } from './PreviewPane.svelte';
 export { default as SaveBackDialog } from './SaveBackDialog.svelte';

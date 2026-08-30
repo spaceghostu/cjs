@@ -31,6 +31,7 @@ import {
 } from '$lib/server/modules/quoting/queries';
 import { CannotSendQuote, sendQuote } from '$lib/server/modules/quoting/send';
 import { createFromQuote, invoiceForQuote } from '$lib/server/modules/invoicing/public';
+import { listPickableItems } from '$lib/server/modules/inventory/public';
 import { loadQuoteLineRows } from '$lib/server/modules/quoting/queries';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -125,7 +126,15 @@ export const load: PageServerLoad = async (event) => {
 			// them gets it. Reserving on open would burn a number per abandoned draft.
 			provisionalNumber: quote.number ? null : await provisionalNumber(ctx.tx),
 			/** Drives the add-line row: the picker when Inventory is owned, T13's offer when not. */
-			inventoryAccess: ctx.access.inventory
+			inventoryAccess: ctx.access.inventory,
+			/**
+			 * What the picker offers, loaded once at page open through Inventory's public
+			 * surface — the composition a ROUTE is allowed that a module is not. A price that
+			 * changes between load and pick is by design: the price is a snapshot the person
+			 * can edit, not a live link. Null when Inventory is not owned; the editor then
+			 * renders the caller's T13 offer instead.
+			 */
+			sourceItems: ctx.access.inventory === 'write' ? await listPickableItems(ctx.tx) : null
 		};
 	});
 };

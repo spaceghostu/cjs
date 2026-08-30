@@ -55,6 +55,7 @@ export {
 	depositIssue,
 	differencesFromRecord,
 	editorFromQuote,
+	lineFromItem,
 	patchFromEditor,
 	priceIssue,
 	qtyIssue,

@@ -169,6 +169,57 @@ export function blankLine(id: string): EditorLine {
 }
 
 /**
+ * A row picked from Inventory. A SNAPSHOT, not a link.
+ *
+ * Everything the item contributes is copied onto the line at this moment: repricing the item
+ * later must never touch a quote already made. Typed structurally rather than importing
+ * `$lib/core/inventory`, so quoting's core stays self-contained — the shape is the part of
+ * `PickableItem` this function actually reads.
+ *
+ * `documentDescription` stays null DELIBERATELY. It prints verbatim on the client-facing
+ * document and no quoting surface can edit or clear it, so copying `item.description` would
+ * put unremovable third-hand text on a client's document; provenance already records origin.
+ *
+ * The provenance line carries the item's unit ("· per board") because a quote line has no
+ * unit column — `qty` is millionths of whatever the line describes, and without the unit a
+ * per-board price is ambiguous. "each" is compared exactly against the schema's default
+ * literal by design: unit is free text, and "Each" earning a redundant suffix is honest.
+ *
+ * The `id` MUST be freshly minted per pick. `reconcileLines`' conflict-update path never
+ * writes `sourceItemId`/`sourceCapturedAt`, so provenance is recorded only when the line
+ * INSERTS — reusing an id would save the pick as an edit and lose the capture time.
+ *
+ * And one invariant for whoever dereferences `sourceItemId` later: it is an unverified client
+ * claim that may be any uuid, including another tenant's real item id. Any future lookup
+ * (SPA-9's cost, say) must run under a tenant-scoped Tx so RLS voids foreign ids — never
+ * under `unsafeDb`.
+ */
+export function lineFromItem(
+	item: {
+		readonly id: string;
+		readonly name: string;
+		readonly unitOfMeasure: string;
+		readonly sellPrice: UnitPrice | null;
+	},
+	id: string
+): EditorLine {
+	const perUnit = item.unitOfMeasure === 'each' ? '' : ` · per ${item.unitOfMeasure}`;
+
+	return {
+		id,
+		description: item.name,
+		provenance: `From Inventory · ${item.name}${perUnit}`,
+		documentDescription: null,
+		qty: '1',
+		// `priceText` renders zero micros as '' — a zero sell price prefills nothing, the same
+		// "absent is not zero" stance the item's own nullable column takes.
+		unitPrice: item.sellPrice === null ? '' : priceText(item.sellPrice),
+		taxTreatment: 'standard',
+		sourceItemId: item.id
+	};
+}
+
+/**
  * WHAT A HALF-TYPED FIELD IS WORTH.
  *
  * An empty or unparseable quantity or price contributes ZERO to the preview rather than
