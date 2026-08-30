@@ -24,6 +24,15 @@
 import type { TaxTreatment } from '$lib/core/money';
 import type { CalendarDate } from './types';
 
+/**
+ * Long enough for anything a person types, short enough not to be storage. Declared here
+ * rather than in the server validator because BOTH sides hold it: the server refuses text
+ * past this, and anything in the browser that writes line text without a person typing it
+ * (`lineFromItem` copies an item name of unbounded length) must clamp to the same number,
+ * or a single picked line makes the whole autosave unsaveable.
+ */
+export const DESCRIPTION_MAX = 2_000;
+
 /** One line, as the editor holds it. `id` is minted in the browser for a new line. */
 export type LinePatch = {
 	readonly id: string;

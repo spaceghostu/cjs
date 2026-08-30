@@ -12,12 +12,12 @@ import { eq } from 'drizzle-orm';
 
 // Hosted Neon: every round trip crosses an ocean, and a test that seeds a tenant makes many.
 // Set locally, for this file only — the global defaults are not this suite's to change.
-vi.setConfig({ testTimeout: 120_000 });
+vi.setConfig({ testTimeout: 120_000, hookTimeout: 180_000 });
 import { closePool, runScoped } from '$lib/server/core/db/client';
 import { item } from '$lib/server/core/db/schema/inventory';
 import { cleanupFixtures, createBusiness, createUser } from '$lib/server/core/db/fixtures';
 import { archiveItem, createItem } from './effects';
-import { listPickableItems, MAX_PAGE_SIZE } from './queries';
+import { listPickableItems } from './queries';
 
 /** Millionths of a rand. R1 780 -> 1_780_000_000. */
 const rand = (n: number) => n * 1_000_000;
@@ -58,13 +58,10 @@ async function addItem(
 	);
 }
 
-// The explicit timeout is for hosted Neon: teardown walks every tenant table per fixture
-// business, and each round trip crosses an ocean. The CLI `--hookTimeout` flag does not reach
-// a project defined with `extends: true`, so the hook carries its own.
 afterAll(async () => {
 	await cleanupFixtures();
 	await closePool();
-}, 180_000);
+});
 
 describe('what the quote editor is offered', () => {
 	it('maps the row to the domain shape, price as a UnitPrice and never raw micros', async () => {
@@ -119,16 +116,15 @@ describe('what the quote editor is offered', () => {
 		expect(twins).toEqual([...twins].sort());
 	});
 
-	it('is bounded, like every other query in this module', async () => {
-		// Not seeded to 501 rows against a hosted database — the bound is asserted where it
-		// lives, alongside the fixture-scoped behaviour above.
+	it('offers exactly what the tenant owns — RLS scopes the read, no filter needed', async () => {
+		// The query's `MAX_PAGE_SIZE` bound is real but not asserted here: proving a limit of
+		// 500 means seeding 501 rows into a hosted database an ocean away, and an assertion
+		// that passes with the `.limit()` deleted would only pretend to. The `.limit()` line
+		// in `listPickableItems` carries the claim.
 		const t = await tenant();
 		await addItem(t, 'European oak, 40mm');
 
 		const rows = await runScoped(t.businessId, t.userId, (tx) => listPickableItems(tx));
-		expect(rows.length).toBeLessThanOrEqual(MAX_PAGE_SIZE);
-
-		// The tenant sees only its own items — RLS scopes the read, the query needs no filter.
 		const foreign = await runScoped(t.businessId, t.userId, (tx) =>
 			tx.select({ id: item.id }).from(item).where(eq(item.businessId, t.businessId))
 		);

@@ -36,11 +36,16 @@
 import { z } from 'zod';
 import { MAX_CENTS } from '$lib/core/money';
 import { check, explainDate, type Checked, type Vocabulary } from '$lib/core/validation';
-import { PROMOTABLE_FIELDS, TAX_TREATMENTS, isCalendarDate } from '$lib/core/quoting';
+import {
+	DESCRIPTION_MAX,
+	PROMOTABLE_FIELDS,
+	TAX_TREATMENTS,
+	isCalendarDate
+} from '$lib/core/quoting';
 import type { DraftPatch } from '$lib/core/quoting/wire';
 
-/** Long enough for anything a person types, short enough not to be storage. */
-const DESCRIPTION_MAX = 2_000;
+// `DESCRIPTION_MAX` lives in `core/quoting/wire.ts` because the browser holds it too —
+// `lineFromItem` clamps copied item names to the same number this validator refuses past.
 const NAME_MAX = 200;
 
 // No message on `.int()` on purpose: a non-integer here was never typed by anybody — the

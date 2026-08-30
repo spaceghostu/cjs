@@ -11,7 +11,7 @@
 	import InventoryPicker from '$lib/components/quoting/InventoryPicker.svelte';
 	import { parseUnitPriceInput } from '$lib/core/money';
 	import type { PickableItem } from '$lib/core/inventory';
-	import Specimen from './Specimen.svelte';
+	import Specimen from './ui/Specimen.svelte';
 
 	const { Story } = defineMeta({
 		title: 'Modules/Inventory picker',
@@ -73,9 +73,26 @@
 
 <!--
 	Owned but empty. The dialog still opens — a trigger that silently does nothing reads as
-	broken — and points at the screen where the first item gets added.
+	broken — and points at the screen where the first item gets added. The play OPENS it and
+	leaves it open, so the empty state's markup is what the a11y gate scans — a branch only
+	rendered inside the dialog is invisible to every check otherwise.
 -->
-<Story name="Nothing in Inventory yet" asChild>
+<Story
+	name="Nothing in Inventory yet"
+	asChild
+	play={async ({ canvas }) => {
+		const trigger = await canvas.getByRole('button', { name: 'pick from Inventory' });
+		await userEvent.click(trigger);
+
+		// The dialog portals to document.body, so the canvas cannot see inside it.
+		await waitFor(() => {
+			const link = Array.from(document.querySelectorAll('a')).find(
+				(a) => a.textContent?.trim() === 'Add your first item'
+			);
+			expect(link, 'the empty state never showed its way to /inventory').toBeDefined();
+		});
+	}}
+>
 	<Specimen title="Inventory picker, empty" note="The dialog opens and points at /inventory.">
 		<InventoryPicker items={[]} {onpick} />
 	</Specimen>

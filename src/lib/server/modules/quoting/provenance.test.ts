@@ -22,7 +22,7 @@ import { and, count, eq, sql } from 'drizzle-orm';
 
 // Hosted Neon: a full quote lifecycle is dozens of round trips, each crossing an ocean.
 // Set locally, for this file only — the global defaults are not this suite's to change.
-vi.setConfig({ testTimeout: 120_000 });
+vi.setConfig({ testTimeout: 120_000, hookTimeout: 180_000 });
 
 /**
  * The mail transport, under our control — `sendQuote` mails INSIDE its transaction, so the
@@ -63,8 +63,6 @@ let oakId: string;
 const OAK_SELL_MICROS = 1_780_000_000;
 const OPENING_QTY_E6 = 40_000_000;
 
-// Explicit hook timeouts, here and below: teardown and seeding cross an ocean to hosted
-// Neon, and the CLI `--hookTimeout` flag does not reach a project defined `extends: true`.
 beforeAll(async () => {
 	owner = await fixtures.createUser('Alice Thornhill');
 	thornhill = await fixtures.createBusiness(owner.id, 'Thornhill Joinery');
@@ -92,12 +90,12 @@ beforeAll(async () => {
 			occurredOn: '2026-08-01'
 		});
 	});
-}, 180_000);
+});
 
 afterAll(async () => {
 	await fixtures.cleanupFixtures();
 	await closePool();
-}, 180_000);
+});
 
 /**
  * The ledger's answer for THIS item — a COUNT as well as a sum, because a +5/−5 pair sums

@@ -25,6 +25,7 @@ import {
 	type UnitPrice
 } from '$lib/core/money';
 import { parseMoneyInput } from '$lib/core/money';
+import { DESCRIPTION_MAX } from './wire';
 import type { DraftPatch, LinePatch } from './wire';
 import type { CalendarDate, DepositTerms, Quote, QuoteLine } from './types';
 
@@ -193,6 +194,14 @@ export function blankLine(id: string): EditorLine {
  * claim that may be any uuid, including another tenant's real item id. Any future lookup
  * (SPA-9's cost, say) must run under a tenant-scoped Tx so RLS voids foreign ids — never
  * under `unsafeDb`.
+ *
+ * Both copied texts are CLAMPED to `DESCRIPTION_MAX`. An item name has no cap — Inventory
+ * accepts whatever a person calls their stock — but the quote wire refuses line text past
+ * the cap, and the save endpoint refuses the WHOLE patch when one field fails. Without the
+ * clamp, picking one long-named item would make every subsequent edit of the draft
+ * unsaveable, with no quoting surface able to shorten the provenance it minted. `slice`
+ * counts UTF-16 code units, the same units zod's `.max` counts, so what leaves here is
+ * exactly what the server will take.
  */
 export function lineFromItem(
 	item: {
@@ -207,8 +216,8 @@ export function lineFromItem(
 
 	return {
 		id,
-		description: item.name,
-		provenance: `From Inventory · ${item.name}${perUnit}`,
+		description: item.name.slice(0, DESCRIPTION_MAX),
+		provenance: `From Inventory · ${item.name}${perUnit}`.slice(0, DESCRIPTION_MAX),
 		documentDescription: null,
 		qty: '1',
 		// `priceText` renders zero micros as '' — a zero sell price prefills nothing, the same

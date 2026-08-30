@@ -6,14 +6,15 @@
  */
 import { describe, expect, it } from 'vitest';
 import { percent, quantity, unitPrice } from '$lib/core/money/ctor';
-import { ZAR, parseUnitPriceInput } from '$lib/core/money';
+import { parseUnitPriceInput, ZAR } from '$lib/core/money';
 import {
 	blankLine,
-	lineFromItem,
 	blockersToSending,
 	depositIssue,
+	DESCRIPTION_MAX,
 	differencesFromRecord,
 	editorFromQuote,
+	lineFromItem,
 	patchFromEditor,
 	priceIssue,
 	priceQuote,
@@ -302,6 +303,19 @@ describe('a line picked from Inventory', () => {
 	it('drops the unit suffix when a unit is the unremarkable one', () => {
 		const hinge = { ...oak, name: 'Hinge pair', unitOfMeasure: 'each' };
 		expect(lineFromItem(hinge, 'l1').provenance).toBe('From Inventory · Hinge pair');
+	});
+
+	it('clamps a boundless item name to what the wire will take', () => {
+		// An item name has no cap, but the server refuses line text past `DESCRIPTION_MAX` —
+		// and refuses the WHOLE autosave when one field fails. An unclamped pick would leave
+		// the draft unsaveable, with no quoting surface able to shorten the provenance.
+		const longNamed = { ...oak, name: 'x'.repeat(DESCRIPTION_MAX + 500) };
+		const line = lineFromItem(longNamed, 'l1');
+
+		expect(line.description.length).toBe(DESCRIPTION_MAX);
+		expect(line.provenance?.length).toBeLessThanOrEqual(DESCRIPTION_MAX);
+		// Truncated, not replaced: what survives is still the head of the real name.
+		expect(line.provenance?.startsWith('From Inventory · xxx')).toBe(true);
 	});
 
 	it('survives the autosave payload with its provenance intact', () => {
