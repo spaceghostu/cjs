@@ -232,7 +232,16 @@ export async function answerSharedQuote(
 			.where(and(eq(quote.id, found.id), sql`${quote.status} in ('sent', 'viewed')`))
 			.returning({ id: quote.id, jobId: quote.jobId, customerId: quote.customerId });
 
-		if (answer === 'accepted' && updated && updated.jobId === null) {
+		// EVERY WRITE THAT FOLLOWS HANGS OFF THE ROW THE UPDATE RETURNED, and that is the whole
+		// of what the comment above promises. The loser of a double click matched zero rows, so
+		// `updated` is undefined and it writes nothing at all: no job, no burnt JOB number, and
+		// no second `accepted` line on the timeline. Recording the event outside this guard
+		// would leave the quote answered once and narrated twice, which is the same
+		// contradiction the guard exists to prevent — only written into the history instead of
+		// into the row.
+		if (!updated) return;
+
+		if (answer === 'accepted' && updated.jobId === null) {
 			await createJobFor(tx, found.businessId, updated.id, updated.customerId);
 		}
 

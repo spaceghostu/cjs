@@ -24,7 +24,7 @@
 import { and, desc, eq, isNull, inArray } from 'drizzle-orm';
 import { commercialState, type CommercialState, type Job, type JobStatus } from '$lib/core/jobs';
 import { todayIn } from '$lib/core/calendar';
-import type { AccessMap, ModuleKey } from '$lib/core/modules/catalogue';
+import type { AccessMap, ModuleKey } from '../entitlement';
 import { quotesForJob } from '$lib/server/modules/quoting/public';
 import { invoicesForJob } from '$lib/server/modules/invoicing/public';
 import { job } from '../db/schema/jobs';
@@ -66,11 +66,21 @@ export type JobListItem = {
 	readonly createdAt: Date;
 };
 
+/**
+ * The ceiling on an unpaginated read.
+ *
+ * Not a page size and not a tuned number: it is the point past which returning everything stops
+ * being reasonable, so that a caller which forgets to say how many it wants gets a bounded
+ * answer rather than a table scan that grows with the tenant. SPA-23's pipeline screen will
+ * bring real paging and this becomes the default it overrides.
+ */
+const DEFAULT_JOB_LIMIT = 100;
+
 export async function listJobs(
 	tx: Tx,
 	options: { statuses?: readonly JobStatus[]; limit?: number } = {}
 ): Promise<readonly JobListItem[]> {
-	const { statuses, limit = 100 } = options;
+	const { statuses, limit = DEFAULT_JOB_LIMIT } = options;
 
 	const rows = await tx
 		.select({

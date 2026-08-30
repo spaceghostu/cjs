@@ -10,6 +10,30 @@
 -- Hand-written here in the same shape as the second half of `0008_inventory.sql`, and asserted
 -- independently by `scripts/invariants.sql` and by `src/lib/server/core/db/schema/jobs.test.ts`.
 --
+-- THESE TWO FILES ARE ONE CHANGE, AND MUST BE APPLIED AS ONE.
+--
+-- `0005_quoting`, `0007_invoicing` and `0008_inventory` each CREATE their tables and ENABLE row
+-- security on them in a single file. This change is split across two because `0009` is
+-- generated and `0010` is hand-written, so between the two files `core_job` exists with the
+-- application role already holding SELECT/INSERT/UPDATE on it — from `0003`'s default
+-- privileges — and NO row security at all. `loadJob` and `listJobs` carry no `business_id`
+-- predicate by design, because the policy is supposed to have decided that already; in that
+-- intermediate state they would return every tenant's jobs.
+--
+-- Nothing reaches that state through the migrator: drizzle-orm wraps all pending migrations in
+-- ONE transaction, so `0009` and `0010` commit together or not at all, and this file failing
+-- rolls that file back. The window opens only if somebody applies these `.sql` files to a
+-- database by hand, one at a time — which is a realistic thing to reach for here, because
+-- `bun run db:migrate` has been observed exiting non-zero with nothing on stdout or stderr, and
+-- it is `drizzle-kit migrate && bun run db:verify`, so a failure there means the invariant check
+-- never runs either.
+--
+-- Folding these statements up into `0009` would be the real fix and is no longer available:
+-- `0009` is journalled, and editing an applied migration is how a schema and its history stop
+-- agreeing. So the rule instead is that these files are never applied separately, and that
+-- anything applied by hand is followed by `bun run db:verify` — which asserts the RLS below
+-- rather than assuming it.
+--
 -- GRANTS NEED NO STATEMENT. `ALTER DEFAULT PRIVILEGES` in `0003_platform.sql` already gives the
 -- application role SELECT/INSERT/UPDATE on every future table in `public`, and no DELETE. Which
 -- is exactly right here: a job is ARCHIVED, never deleted. A job that has been invoiced is part

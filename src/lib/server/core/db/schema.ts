@@ -8,8 +8,8 @@
  * Ordering below mirrors the architecture:
  *   identity  — the one non-tenant domain (better-auth). See ./schema/identity.ts.
  *   core      — platform-owned tables every module shares (M2)
- *   billing   — subscriptions and entitlement (M2)
  *   jobs      — the work itself, referenced by quoting and invoicing (SPA-20)
+ *   billing   — subscriptions and entitlement (M2)
  *   ledger    — core_posting / core_allocation (M2; in use from T19, see ./schema/ledger.ts)
  *   audit     — append-only row change log (M2)
  *   modules   — one line per module, appended by the scaffold

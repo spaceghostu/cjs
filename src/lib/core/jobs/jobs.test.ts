@@ -87,8 +87,6 @@ describe('a job billed in phases', () => {
 	});
 
 	it('settling every invoice changes the derivation and nothing else', () => {
-		const status: JobStatus = 'in_progress';
-
 		const before = state({ invoices: [invoice(1000, 0, 'paid'), invoice(2400, 2400)] });
 		const after = state({ invoices: [invoice(1000, 0, 'paid'), invoice(2400, 0, 'paid')] });
 
@@ -96,26 +94,43 @@ describe('a job billed in phases', () => {
 		expect(after.kind).toBe('settled');
 		if (after.kind !== 'settled') return;
 		expect(after.invoiced.cents).toBe(340_000);
-		// The point of the pair: the input status is not something the derivation can touch.
-		expect(status).toBe('in_progress');
+		// No job status appears in this case, and that absence IS the claim: `commercialState`
+		// takes quotes, invoices, entitlements and a date, and there is no parameter through
+		// which a status could reach it. Declaring one here to assert it had not changed would
+		// have been a local variable checking its own initialiser. The version of this claim
+		// that can fail is in the database suite, where a stored status is read back after the
+		// money moves — 'settling everything moves the derivation and leaves the status
+		// byte-identical'.
 	});
 });
 
-describe('which invoices count as money owed', () => {
-	it('a draft invoice on a job is not money owed', () => {
-		// The query never hands a draft to the derivation — `invoicesForJob` filters it out — so
-		// a job with an accepted quote and only a draft invoice reads as `accepted`.
+/**
+ * DRAFT AND CANCELLED ARE FILTERED UPSTREAM, NOT HERE.
+ *
+ * `invoicesForJob` admits only stored `sent`, `viewed` and `paid`, so this function is never
+ * handed a draft or a cancelled invoice and contains no branch that would recognise one. These
+ * two cases therefore assert what the derivation does with what SURVIVES that filter — they are
+ * not, and cannot be, evidence that the filter exists. The filter itself is held in place by
+ * `src/lib/server/core/jobs/jobs.test.ts`, which cancels a real invoice against a real database
+ * and checks that the job's figures do not move; naming these two after the filter would have
+ * left that job to a test that could not do it.
+ */
+describe('what reaches the derivation once the query has filtered', () => {
+	it('a job whose only invoice was filtered out still reads from its quote', () => {
+		// The empty list is what `invoicesForJob` returns for a job carrying nothing but a draft.
+		// With no money in evidence, the accepted quote is the most advanced thing known.
 		const derived = state({ quotes: [quote({ status: 'accepted' })], invoices: [] });
 		expect(derived.kind).toBe('accepted');
 	});
 
-	it('a cancelled invoice is excluded from both sums', () => {
-		// Same reasoning, same query filter: a cancelled invoice was withdrawn and is owed
-		// nothing. What reaches here is one live invoice, and only its figures appear.
+	it('sums only the invoices it is given, and invents nothing beside them', () => {
+		// One live invoice in, one live invoice's figures out. A job that also carried a
+		// withdrawn R1 000 would arrive here looking exactly like this.
 		const derived = state({ invoices: [invoice(2400, 2400)] });
 		expect(derived.kind).toBe('invoiced');
 		if (derived.kind !== 'invoiced') return;
 		expect(derived.invoiced.cents).toBe(240_000);
+		expect(derived.outstanding.cents).toBe(240_000);
 	});
 });
 
@@ -144,17 +159,25 @@ describe('quotes are read through their calendar', () => {
 	});
 });
 
-describe('the two facts are independent', () => {
+describe('the money half of the two independent facts', () => {
 	/**
-	 * The ticket's headline: "done, R2 400 outstanding" is storable and sayable. The pair is the
-	 * point — a status the person set, and a commercial state nobody set at all.
+	 * The ticket's headline is "done, R2 400 outstanding": a status the person set, and a
+	 * commercial state nobody set at all. Only the second half is provable HERE, because a pure
+	 * derivation that is never shown a status cannot demonstrate anything about one — the pair
+	 * needs a row with both columns on it, and that case lives in the database suite. What this
+	 * file contributes is the half it owns, stated so the other half has something to pair with.
 	 */
-	it('done with an outstanding invoice is two independent facts', () => {
-		const status: JobStatus = 'done';
+	it('money still owed is a state the derivation can reach on its own', () => {
+		// Half of the ticket's headline, and the only half this file can prove: R2 400 is
+		// outstanding, derived from invoices alone with no status anywhere in the input. That
+		// `job.status` is free to say 'done' at the same moment is a fact about two columns and
+		// is asserted where both exist — `src/lib/server/core/jobs/jobs.test.ts`, 'reads as done
+		// and invoiced at once, which is the whole point'.
 		const derived = state({ invoices: [invoice(2400, 2400)] });
 
-		expect(status).toBe('done');
 		expect(derived.kind).toBe('invoiced');
+		if (derived.kind !== 'invoiced') return;
+		expect(derived.outstanding.cents).toBe(240_000);
 	});
 });
 

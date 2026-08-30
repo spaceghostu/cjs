@@ -43,7 +43,16 @@ export function commercialSentence(state: CommercialState): string {
 		case 'expired':
 			return 'Quote lapsed';
 		case 'accepted':
-			return 'Accepted, not yet scheduled';
+			// "Quote accepted", and deliberately NOT "Accepted, not yet scheduled" — which is
+			// what the ticket's example list says and what this line said first. Scheduling is
+			// `job.status`, and `commercialState` is never shown it: a job whose quote was
+			// accepted and whose owner has since set it to `in_progress` is an ordinary state,
+			// and the longer sentence would have rendered "Accepted, not yet scheduled" beside
+			// `statusLabel` saying "Under way". Two owners for one fact, disagreeing on a
+			// screen, is the exact legacy defect SPA-20 exists to remove; a sentence that
+			// reintroduces it in words is no better than a column that reintroduces it in data.
+			// Each half is said by whoever knows it, and the screen puts them side by side.
+			return 'Quote accepted';
 		case 'invoiced':
 			return `Invoiced · ${formatZar(state.outstanding)} still owed`;
 		case 'settled':
