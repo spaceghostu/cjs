@@ -1,0 +1,37 @@
+# THE REPO'S FIRST CI — and deliberately only the two browser suites.
+#
+# `test:stories` is the accessibility gate: every story file, in light AND dark, with axe at
+# error severity (.storybook/preview.ts). `test:mobile` holds the 44px touch floors and the
+# no-sideways-scroll assertions at 390px. Both mount components in a headless Chromium and
+# need NO database and NO secrets — vite.config.ts gives the RLS setup file only to the
+# `unit` project — so they can block every pull request today without a single credential
+# in this file.
+#
+# The unit suite is excluded on purpose: it needs a Neon DATABASE_URL under a non-BYPASSRLS
+# role (scripts/vitest-setup.ts hard-refuses anything else), and wiring that secret is its
+# own follow-up. So is marking this workflow a required check in branch protection, which
+# should happen only after its first green run. Both follow-ups inherit this file's shape:
+# least-privilege permissions, actions pinned to full commit SHAs.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# The job only checks out and runs tests; nothing here may write to the repo, and the
+# future secret-bearing unit-suite workflow copies this line rather than loosening it.
+permissions:
+  contents: read
+
+jobs:
+  browser-suites:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run test:stories
+      - run: bun run test:mobile

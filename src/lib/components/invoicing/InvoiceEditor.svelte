@@ -29,6 +29,7 @@
 	 * `±0.00`. A line at zero because it is being thrown in is not the same fact as a line nobody
 	 * has priced, and the button that issues the invoice blocks on one and not the other.
 	 */
+	import Check from '@lucide/svelte/icons/check';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import {
@@ -71,6 +72,7 @@
 		usualDays,
 		saving = false,
 		issuing = false,
+		lastSavedAtMs = null,
 		message = null,
 		onsave,
 		onsaveretry,
@@ -86,6 +88,12 @@
 		usualDays: number;
 		saving?: boolean;
 		issuing?: boolean;
+		/**
+		 * When the last explicit save LANDED, epoch milliseconds. Null until one has. It feeds
+		 * the status line beside Save — the announcement a screen reader gets in place of
+		 * watching the button's label flip.
+		 */
+		lastSavedAtMs?: number | null;
 		message?: string | null;
 		/**
 		 * Present only when `message` came from the SAVE endpoint, so the banner offers a retry
@@ -132,6 +140,19 @@
 
 	function removeLine(id: string) {
 		state.lines = state.lines.filter((l) => l.id !== id);
+	}
+
+	/**
+	 * "21:47" — the same six lines as `clockTime` in `quoting/state.svelte.ts`, duplicated
+	 * rather than imported: a cross-module reach into `components/quoting` has no precedent in
+	 * this codebase, and two callers is not yet the case for promoting it to a shared core. A
+	 * third caller should do that promotion instead of copying this again.
+	 */
+	function savedClock(atMs: number): string {
+		// A transient read of the clock, not reactive state — nothing holds this object and
+		// nothing mutates it.
+		const at = new Date(atMs);
+		return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
 	}
 
 	function chooseCustomer(id: string) {
@@ -347,6 +368,30 @@
 			>
 				{issuing ? 'Issuing…' : 'Issue and send'}
 			</Button>
+
+			<!--
+				The save, said out loud. The button's label flips to "Saving…" but a label change
+				is not an announcement, and a successful save was silent — so this is the same
+				visible 13px polite line `quoting/SaveState.svelte` draws, always in the DOM
+				because a live region mounted mid-flight does not reliably announce its first
+				message. The clock in the saved sentence makes consecutive saves re-announce.
+
+				This and the `Refusal` above are two polite regions with DISJOINT content: errors
+				are announced only by the Refusal, save progress only here — so nothing is
+				announced twice, which is the operative clause of Refusal.svelte's "exactly one
+				polite region per surface" doctrine. The saved sentence is also suppressed while
+				`message` is non-null, because after a failed save `lastSavedAtMs` still holds the
+				PREVIOUS success and a stale "All changes saved" beside a Refusal saying the save
+				failed would be the indicator lying.
+			-->
+			<p class="flex items-center gap-1.5 text-[13px]" aria-live="polite">
+				{#if saving}
+					<span class="text-ink-muted">Saving…</span>
+				{:else if lastSavedAtMs !== null && message === null}
+					<Check size={14} aria-hidden="true" class="shrink-0 text-settled" />
+					<span class="text-ink-secondary">All changes saved · {savedClock(lastSavedAtMs)}</span>
+				{/if}
+			</p>
 		</div>
 
 		{#if blockers.length > 0}

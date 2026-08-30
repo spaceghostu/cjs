@@ -106,7 +106,13 @@
 			<ChevronLeft class="size-5" aria-hidden="true" />
 		</a>
 
-		<p class="numeric text-[15px] font-medium text-ink">{document.number}</p>
+		<!--
+			The screen's h1, not a styled <p>: this is the whole page on a phone, and the invoice
+			number is its name. Without it the sr-only "What is on this invoice" below was an h2
+			under no h1 — a heading outline that starts one level down. Preflight zeroes h1's
+			default size and margins, so the classes carry the design unchanged.
+		-->
+		<h1 class="numeric text-[15px] font-medium text-ink">{document.number}</h1>
 
 		<a
 			href="/documents/{invoiceId}/pdf"
@@ -119,7 +125,12 @@
 		</a>
 	</header>
 
-	<main class="flex-1 px-4 pb-4">
+	<!--
+		A <div>, deliberately not <main>: this whole composition renders inside the (app)
+		layout's <main>, so a second main here put nested main landmarks on every phone invoice
+		view — one screen claiming to be the page's principal content twice.
+	-->
+	<div class="flex-1 px-4 pb-4">
 		<!-- ── Lead with the answer ───────────────────────────────────────────────────── -->
 		<section>
 			{#if cancelled}
@@ -177,7 +188,7 @@
 		<section class="mt-6">
 			<ActivityTimeline events={recent} {viewerUserId} {clientName} {memberNames} />
 		</section>
-	</main>
+	</div>
 
 	{#if !cancelled}
 		<!--
