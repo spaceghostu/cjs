@@ -16,3 +16,6 @@ export { commercialState } from './commercial';
 export type { CommercialInput, CommercialState, JobInvoice, JobQuote } from './commercial';
 
 export { commercialSentence, statusLabel } from './copy';
+
+export { materialsFromMovements } from './materials';
+export type { JobMovementCost, MaterialsDerivation } from './materials';

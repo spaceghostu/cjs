@@ -106,9 +106,33 @@ const credit = negateMoney;
  * store; anything else with a recorded cost is LABOUR or subcontract. Putting a "cost type"
  * dropdown in front of somebody trying to send an invoice would be asking them a bookkeeping
  * question to answer a plumbing one.
+ *
+ * Labour's cost BASIS is the quote's charged amount (Q5: no rate card, no timesheets — the
+ * charge is the only labour figure that exists), recorded under source `charged` so the panel
+ * can say what it is. The CR to `cost_payable` is then what the work is treated as owing
+ * whoever did it, and the panel's sentence — not the books — carries the qualification.
  */
 export function costKindOf(row: Pick<InvoiceLineRow, 'costSource' | 'sourceItemId'>): CostKind {
 	return row.costSource === 'inventory' || row.sourceItemId !== null ? 'materials' : 'labour';
+}
+
+/**
+ * The labour cost `createFromQuote` snapshots onto a copied line, or null where it must not.
+ *
+ * PER-UNIT, exactly as `costMicros` is stored — `lineCost` below multiplies by the quantity, the
+ * same `toUnitPrice`/`lineAmount` route the charge side takes, so the posted cost equals the
+ * charged line amount to the cent. Null for a sourced line, whose cost is Inventory's to record,
+ * and null for a negative price, which `cost_not_negative` would refuse anyway (quote lines
+ * carry no price-sign CHECK, so it has to be caught here). Zero is not null: a zero-priced line
+ * has a real recorded cost of nothing.
+ */
+export function chargedLabourCost(line: {
+	readonly sourceItemId: string | null;
+	readonly unitPriceMicros: number;
+}): number | null {
+	if (line.sourceItemId !== null) return null;
+	if (line.unitPriceMicros < 0) return null;
+	return line.unitPriceMicros;
 }
 
 /**

@@ -18,7 +18,7 @@ import { notFound } from '$lib/core/refusals';
 import { withModule } from '$lib/server/core/ctx';
 import { loadInvoiceRow, loadPayments } from '$lib/server/modules/invoicing/queries';
 import { workingsFor } from '$lib/server/modules/invoicing/ledger';
-import { marginFor } from '$lib/server/modules/invoicing/margin';
+import { costsCameFromInventory, marginFor } from '$lib/server/modules/invoicing/margin';
 import { toMoney } from '$lib/server/core/db/map';
 import type { PageServerLoad } from './$types';
 
@@ -30,19 +30,24 @@ export const load: PageServerLoad = async (event) => {
 		}
 
 		const payments = await loadPayments(ctx.tx, header.id);
-		const [lines, margin] = await Promise.all([
+		const [lines, margin, fromInventory] = await Promise.all([
 			workingsFor(
 				ctx.tx,
 				header.id,
 				payments.map((p) => p.id)
 			),
-			marginFor(ctx.tx, header.id, ctx.business.currency, ctx.access.inventory === 'write')
+			marginFor(ctx.tx, header.id, ctx.business.currency, ctx.access.inventory === 'write'),
+			// The footnote's claim is about provenance, and the detail page already computes the
+			// truth of it; hardcoding `true` here would say "came from Inventory" over figures
+			// that are charge-derived labour.
+			costsCameFromInventory(ctx.tx, header.id)
 		]);
 
 		return {
 			number: header.numberFormatted,
 			invoiceId: header.id,
 			margin,
+			fromInventory,
 			// The amounts cross as `Money` so the page never formats an integer by hand — the same
 			// rule every other screen follows.
 			lines: lines.map((line) => ({

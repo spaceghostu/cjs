@@ -78,6 +78,13 @@
       "when": 1788042751749,
       "tag": "0010_jobs_platform",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788114689864,
+      "tag": "0011_curly_elektra",
+      "breakpoints": true
     }
   ]
 }

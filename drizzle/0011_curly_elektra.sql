@@ -1,0 +1,2 @@
+ALTER TABLE "invoicing_invoice_line" DROP CONSTRAINT "invoicing_invoice_line_cost_source_known";--> statement-breakpoint
+ALTER TABLE "invoicing_invoice_line" ADD CONSTRAINT "invoicing_invoice_line_cost_source_known" CHECK ("invoicing_invoice_line"."cost_source" in ('inventory', 'manual', 'charged'));

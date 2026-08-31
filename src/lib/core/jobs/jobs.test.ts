@@ -12,12 +12,13 @@
  */
 import { describe, expect, it } from 'vitest';
 import { ZAR } from '$lib/core/money';
-import { money } from '$lib/core/money/ctor';
+import { money, quantity, unitPrice } from '$lib/core/money/ctor';
 import type { CalendarDate } from '$lib/core/calendar';
 import type { ModuleKey } from '$lib/core/modules/catalogue';
 import {
 	commercialSentence,
 	commercialState,
+	materialsFromMovements,
 	statusLabel,
 	type CommercialState,
 	type JobInvoice,
@@ -240,5 +241,55 @@ describe('the words', () => {
 			expect(statusLabel(one).length).toBeGreaterThan(0);
 			expect(statusLabel(one)).not.toContain('_');
 		}
+	});
+});
+
+describe('materials cost derived from movements', () => {
+	// The seam for SPA-23, exercised the way its header promises it will be wired: rows shaped
+	// like a job's movements in, an honest materials figure out. Pure — no database, no clock.
+	const pull = (e6: number, priceMicros: number | null) => ({
+		qty: quantity(-e6),
+		unitCost: priceMicros === null ? null : unitPrice(priceMicros, ZAR)
+	});
+
+	it('negates the signed pulls into a positive cost', () => {
+		// 2 boards out at R500 each, 1 metre out at R120: consumption is the NEGATION of the
+		// signed sum, so stock leaving reads as money spent.
+		const result = materialsFromMovements(ZAR, [
+			pull(2_000_000, 500_000_000),
+			pull(1_000_000, 120_000_000)
+		]);
+
+		expect(result.cost?.cents).toBe(112_000);
+		expect(result.totalMovements).toBe(2);
+		expect(result.costedMovements).toBe(2);
+	});
+
+	it('nets a return back out again', () => {
+		// 3 boards pulled, 1 brought back: the job consumed 2, and the figure says so.
+		const result = materialsFromMovements(ZAR, [
+			pull(3_000_000, 500_000_000),
+			{ qty: quantity(1_000_000), unitCost: unitPrice(500_000_000, ZAR) }
+		]);
+
+		expect(result.cost?.cents).toBe(100_000);
+	});
+
+	it('degrades on a movement with no unit cost rather than counting it as free', () => {
+		const result = materialsFromMovements(ZAR, [
+			pull(2_000_000, 500_000_000),
+			pull(1_000_000, null)
+		]);
+
+		// The costed rows still produce a figure; the counts say it is partial, which is the
+		// same honesty contract the margin panel's caveat enforces.
+		expect(result.cost?.cents).toBe(100_000);
+		expect(result.totalMovements).toBe(2);
+		expect(result.costedMovements).toBe(1);
+	});
+
+	it('returns no cost at all when nothing is known', () => {
+		expect(materialsFromMovements(ZAR, []).cost).toBeNull();
+		expect(materialsFromMovements(ZAR, [pull(1_000_000, null)]).cost).toBeNull();
 	});
 });

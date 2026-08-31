@@ -291,7 +291,8 @@ export const MARGIN_KNOWN: MarginPanel = marginPanel({
 	],
 	totalLines: 3,
 	costedLines: 2,
-	inventoryOwned: true
+	inventoryOwned: true,
+	chargedLabourLines: 0
 });
 
 export const MARGIN_UNKNOWN: MarginPanel = marginPanel({
@@ -299,7 +300,8 @@ export const MARGIN_UNKNOWN: MarginPanel = marginPanel({
 	costs: [],
 	totalLines: 3,
 	costedLines: 0,
-	inventoryOwned: false
+	inventoryOwned: false,
+	chargedLabourLines: 0
 });
 
 /** The badge matrix — every branch of `statusCopy`, labelled for the story note. */
