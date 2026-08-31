@@ -85,7 +85,7 @@
 					<a
 						href={item.href}
 						aria-current={active ? 'page' : undefined}
-						class="flex h-[38px] items-center gap-2.5 rounded-md px-2.5 text-ui transition-colors duration-150 ease-out-forward outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+						class="flex h-[38px] items-center gap-2.5 rounded-md px-2.5 text-ui transition-colors duration-150 ease-out-forward outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 						class:bg-surface-raised={active}
 						class:font-medium={active}
 						class:text-ink={active}
@@ -143,7 +143,7 @@
 				href={row.href}
 				data-sveltekit-reload={row.reload ? true : undefined}
 				aria-current={pathname === row.href ? 'page' : undefined}
-				class="flex h-[34px] items-center gap-2.5 rounded-md px-2.5 text-ui text-ink-secondary transition-colors duration-150 ease-out-forward outline-none hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+				class="flex h-[34px] items-center gap-2.5 rounded-md px-2.5 text-ui text-ink-secondary transition-colors duration-150 ease-out-forward outline-none hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 			>
 				<span class="flex-1">{row.label}</span>
 				{#if row.href === MODULES_HREF}
@@ -162,7 +162,7 @@
 		<form method="POST" action="/sign-out">
 			<button
 				type="submit"
-				class="flex h-[34px] w-full items-center gap-2.5 rounded-md px-2.5 text-left text-ui text-ink-secondary transition-colors duration-150 ease-out-forward outline-none hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+				class="flex h-[34px] w-full items-center gap-2.5 rounded-md px-2.5 text-left text-ui text-ink-secondary transition-colors duration-150 ease-out-forward outline-none hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 			>
 				Sign out
 			</button>

@@ -24,6 +24,7 @@ import {
 	type StoredInvoiceStatus
 } from '$lib/core/invoicing';
 import { todayIn, type CalendarDate } from '$lib/core/calendar';
+import type { JobInvoice } from '$lib/core/jobs';
 import { sumMoney, zero, type Money } from '$lib/core/money';
 import { peekDocumentNumber } from '$lib/server/core/db/numbering';
 import { customer as customerTable } from '$lib/server/core/db/schema/core';
@@ -252,6 +253,72 @@ export async function listInvoices(
 	});
 
 	return { items, total, page: Math.max(1, page), pageSize: size };
+}
+
+/**
+ * WHAT A JOB HAS BEEN BILLED, AND WHAT IS STILL OWED ON IT.
+ *
+ * Built exactly like `listInvoices` above rather than with `settle()`, and the reason is
+ * mechanical: `settle(total, payments)` takes payment ROWS, while the batched `paidByInvoice`
+ * returns money already summed per invoice. The two do not compose, which is why `listInvoices`
+ * reaches for the private `subtractClamped` — and why this function lives in this file, where
+ * both private helpers are in scope, rather than in the jobs code that calls it.
+ *
+ * Two round trips regardless of how many payments the job's invoices carry between them: one
+ * SELECT for the invoices, one grouped query for what has been received against them.
+ *
+ * DRAFT AND CANCELLED ARE EXCLUDED, for the reason written out above `listInvoices`'s
+ * `outstanding` mapping: a draft is owed nothing, because it has not been sent to anybody; a
+ * cancelled invoice is owed nothing, because it was withdrawn. `isOutstanding` in
+ * `$lib/core/invoicing/status.ts` is the same predicate said another way. The exclusion is also
+ * what makes the non-nullable `total` here honest — a draft has no snapshot total at all.
+ *
+ * NOTHING RE-DERIVES `outstanding` DOWNSTREAM. A second implementation would eventually disagree
+ * with this one about a partly-paid invoice, which is the exact failure `settlement.ts` exists to
+ * prevent.
+ *
+ * Exported through `public.ts`, because the caller is outside Invoicing.
+ */
+export async function invoicesForJob(tx: Tx, jobId: string): Promise<readonly JobInvoice[]> {
+	const rows = await tx
+		.select({
+			id: invoice.id,
+			status: invoice.status,
+			totalCents: invoice.snapshotTotalCents,
+			currency: invoice.currency
+		})
+		.from(invoice)
+		.where(
+			and(
+				isNull(invoice.archivedAt),
+				eq(invoice.jobId, jobId),
+				sql`${invoice.status} in ('sent', 'viewed', 'paid')`
+			)
+		)
+		.orderBy(desc(invoice.updatedAt));
+
+	const paid = await paidByInvoice(
+		tx,
+		rows.map((row) => row.id)
+	);
+
+	return rows.flatMap((row) => {
+		// An issued invoice always has a snapshot total — `snapshot_required_once_issued` says
+		// so. Skipping rather than inventing a zero keeps that a claim about the database rather
+		// than a silent hole in somebody's job figure.
+		if (row.totalCents === null) return [];
+
+		const total = toMoney(row.totalCents, row.currency);
+		const received = paid.get(row.id);
+
+		return [
+			{
+				status: row.status as StoredInvoiceStatus,
+				total,
+				outstanding: received ? subtractClamped(total, received) : total
+			}
+		];
+	});
 }
 
 /**

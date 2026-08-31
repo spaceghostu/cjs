@@ -18,7 +18,13 @@
 	let { cards }: { cards: readonly MonthCard[] } = $props();
 </script>
 
-<section data-slot="month" class="grid gap-3.5 sm:grid-cols-3" aria-label="This month">
+<!--
+	A <div>, not a labelled <section>: the page already wraps this grid in a section named by
+	the "This month" eyebrow, so a second landmark in here carrying the same name gave every
+	screen-reader landmark list "This month" twice (axe: landmark-unique). The composition owns
+	the landmark; this component is just the cards.
+-->
+<div data-slot="month" class="grid gap-3.5 sm:grid-cols-3">
 	{#each cards as card (card.slot)}
 		<!-- 18px padding, 8px internal gap, 10px radius. -->
 		<div class="flex flex-col gap-2 rounded-[10px] bg-surface-card p-[18px]">
@@ -45,4 +51,4 @@
 			<span class="text-helper text-ink-muted">{card.footnote}</span>
 		</div>
 	{/each}
-</section>
+</div>

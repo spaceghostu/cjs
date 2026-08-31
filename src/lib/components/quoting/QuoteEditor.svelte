@@ -31,6 +31,7 @@
 		editorFromQuote,
 		editorTaxLabel,
 		lineAmounts,
+		lineFromItem,
 		patchFromEditor,
 		priceQuote,
 		quoteDocument,
@@ -41,7 +42,9 @@
 		type Quote
 	} from '$lib/core/quoting';
 	import type { DocumentIssuer } from '$lib/core/document';
+	import type { PickableItem } from '$lib/core/inventory';
 	import EditorHeader from './EditorHeader.svelte';
+	import InventoryPicker from './InventoryPicker.svelte';
 	import LineTable from './LineTable.svelte';
 	import PreviewPane from './PreviewPane.svelte';
 	import SaveBackDialog from './SaveBackDialog.svelte';
@@ -64,7 +67,8 @@
 		pdfHref,
 		sending = false,
 		onsend,
-		inventoryOffer
+		inventoryOffer,
+		sourceItems = null
 	}: {
 		quote: Quote;
 		issuer: DocumentIssuer;
@@ -80,6 +84,13 @@
 		sending?: boolean;
 		onsend: () => void;
 		inventoryOffer?: Snippet;
+		/**
+		 * What the picker offers, when Inventory is owned. NULL means "not offered" — the
+		 * caller's own `inventoryOffer` (T13's add-the-module link) renders instead. An EMPTY
+		 * ARRAY means "owned but nothing in it": the picker still renders, and its dialog
+		 * points at /inventory. The two are different facts and get different rows.
+		 */
+		sourceItems?: readonly PickableItem[] | null;
 	} = $props();
 
 	/*
@@ -191,6 +202,16 @@
 		globalThis.location.reload();
 	}
 
+	/**
+	 * A pick appends a snapshotted line, exactly as "Add a line" appends a blank one — and
+	 * the autosave `$effect` above picks it up like any other edit. The uuid is freshly
+	 * minted PER PICK, and that is load-bearing: `reconcileLines`' update path never writes
+	 * `sourceItemId`, so provenance is only recorded when the line inserts.
+	 */
+	function pickItem(item: PickableItem): void {
+		draft.lines = [...draft.lines, lineFromItem(item, crypto.randomUUID())];
+	}
+
 	async function send() {
 		// Everything typed goes first. The alternative is emailing a client a document that is
 		// missing the last thing somebody wrote.
@@ -199,6 +220,17 @@
 		onsend();
 	}
 </script>
+
+<!--
+	The add-line row's last word. When the route supplied items, the picker takes the slot
+	LineTable offers; when it supplied null, the caller's own `inventoryOffer` — T13's link to
+	add the module — passes through untouched below.
+-->
+{#snippet picker()}
+	{#if sourceItems !== null}
+		<InventoryPicker items={sourceItems} onpick={pickItem} />
+	{/if}
+{/snippet}
 
 <div class="flex h-full min-h-0 flex-col">
 	<EditorHeader
@@ -210,6 +242,7 @@
 		{sending}
 		canSend={blockers.length === 0}
 		onsend={send}
+		onretry={() => void autosave.flush()}
 	/>
 
 	<div class="flex min-h-0 flex-1">
@@ -223,7 +256,7 @@
 					{amounts}
 					onadd={() => (draft.lines = [...draft.lines, blankLine(crypto.randomUUID())])}
 					onremove={(id) => (draft.lines = draft.lines.filter((l: EditorLine) => l.id !== id))}
-					{inventoryOffer}
+					inventoryOffer={sourceItems === null ? inventoryOffer : picker}
 				/>
 
 				<div class="flex justify-end">

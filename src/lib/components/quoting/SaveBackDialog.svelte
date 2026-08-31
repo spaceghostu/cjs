@@ -78,7 +78,7 @@
 					<label class="flex items-start gap-2.5 text-ui text-ink">
 						<input
 							type="checkbox"
-							class="mt-1 size-4 accent-[var(--brand)]"
+							class="mt-1 size-4 accent-[var(--brand)] outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 							checked={chosen.has(difference.field)}
 							onchange={() => toggle(difference.field)}
 						/>

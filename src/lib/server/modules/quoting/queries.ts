@@ -16,6 +16,7 @@ import {
 	type Quote,
 	type QuoteStatus
 } from '$lib/core/quoting';
+import type { JobQuote } from '$lib/core/jobs';
 import type { Money } from '$lib/core/money';
 import { customer as customerTable } from '$lib/server/core/db/schema/core';
 import { quote, quoteLine, quotingSetting } from '$lib/server/core/db/schema/quoting';
@@ -173,6 +174,30 @@ export async function listQuotes(
 		updatedAt: row.updatedAt,
 		sentAt: row.sentAt
 	}));
+}
+
+/**
+ * WHAT A JOB HAS BEEN QUOTED.
+ *
+ * A projection, not a `Quote`, and the reason is the one this file already gives about the list:
+ * the jobs derivation needs a status and a date and nothing else, and loading whole priced
+ * documents to answer "has anything been accepted?" is the N+1 the review checklist names.
+ *
+ * `validUntil` is NOT optional. `$lib/core/jobs/commercial.ts` folds every quote through
+ * `effectiveStatus` before it looks at anything, because expiry is reached by the calendar with
+ * nothing running — and a projection without the date would report a lapsed quote as "Quote
+ * sent" on a job screen while the quotes list showed it as expired.
+ *
+ * Exported through `public.ts`, because the caller is outside Quoting.
+ */
+export async function quotesForJob(tx: Tx, jobId: string): Promise<readonly JobQuote[]> {
+	const rows = await tx
+		.select({ status: quote.status, validUntil: quote.validUntil })
+		.from(quote)
+		.where(and(isNull(quote.archivedAt), eq(quote.jobId, jobId)))
+		.orderBy(desc(quote.updatedAt));
+
+	return rows.map((row) => ({ status: row.status as QuoteStatus, validUntil: row.validUntil }));
 }
 
 /**

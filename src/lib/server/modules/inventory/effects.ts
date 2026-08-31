@@ -19,6 +19,7 @@ import type { Tx } from '$lib/server/core/ctx';
 import { item, location, movement } from '$lib/server/core/db/schema/inventory';
 import { todayIn, type CalendarDate } from '$lib/core/calendar';
 import { isMovementReason, type MovementReason } from '$lib/core/inventory';
+import { notFoundMessage } from '$lib/core/refusals';
 
 /**
  * Something the person asked for that the module will not do, with a sentence they can act on.
@@ -54,6 +55,19 @@ export type ItemInput = {
  * settings screen that does not exist. Matched case-insensitively on the name, because a person
  * who typed "rack a" meant the "Rack A" they already have, and two rows differing only in case
  * would make "where is it" ambiguous on every row that answered with one.
+ *
+ * THE `business_id` TERM IS NOT REDUNDANT WITH ROW LEVEL SECURITY, even though RLS would filter
+ * the same rows out in production. It is the difference between a query that is correct and a
+ * query that is merely policed. Five different businesses in this system own a location called
+ * "Rack A"; a match on the name alone is a query that ASKS for all five and is saved only by the
+ * `tenant_isolation` policy happening to be in force on that connection. It is not in force for
+ * the owner role, which is what migrations and — until the guard in `scripts/vitest-setup.ts` —
+ * test runs connect as, and the shared preview database carries hundreds of `inventory_movement`
+ * rows pointing at another tenant's location as a direct result. The database could not refuse
+ * them either, because `inventory_movement.location_id` has a single-column foreign key rather
+ * than the composite `(item_id, currency)` one its sibling item reference uses. Making the FK
+ * composite so the constraint refuses a cross-tenant reference outright is the right second half
+ * of this, and it is a schema change with a data clean-up behind it, so it is its own ticket.
  */
 export async function resolveLocation(
 	tx: Tx,
@@ -69,7 +83,7 @@ export async function resolveLocation(
 	const [existing] = await tx
 		.select({ id: location.id })
 		.from(location)
-		.where(sql`lower(${location.name}) = lower(${name})`);
+		.where(and(eq(location.businessId, businessId), sql`lower(${location.name}) = lower(${name})`));
 
 	if (existing) return existing.id;
 
@@ -181,7 +195,7 @@ export async function updateItem(
 		.where(eq(item.id, itemId))
 		.returning({ id: item.id });
 
-	if (updated.length === 0) throw new CannotDoThat("We couldn't find that item.");
+	if (updated.length === 0) throw new CannotDoThat(notFoundMessage('item'));
 }
 
 /**
@@ -211,7 +225,7 @@ export async function restoreItem(tx: Tx, itemId: string): Promise<void> {
 		.where(eq(item.id, itemId))
 		.returning({ id: item.id });
 
-	if (updated.length === 0) throw new CannotDoThat("We couldn't find that item.");
+	if (updated.length === 0) throw new CannotDoThat(notFoundMessage('item'));
 }
 
 export type MovementInput = {

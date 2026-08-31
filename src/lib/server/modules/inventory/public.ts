@@ -7,3 +7,4 @@
  * exposes a query, a table or an effect.
  */
 export { summariseInventory } from './summary';
+export { listPickableItems } from './queries';

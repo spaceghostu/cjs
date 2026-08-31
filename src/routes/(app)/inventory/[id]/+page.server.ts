@@ -15,6 +15,7 @@ import { error, fail } from '@sveltejs/kit';
 import { withModule } from '$lib/server/core/ctx';
 import { todayIn } from '$lib/core/calendar';
 import { lineAmount } from '$lib/core/money';
+import { notFound } from '$lib/core/refusals';
 import {
 	DEFAULT_PAGE_SIZE,
 	levelsForItem,
@@ -42,7 +43,7 @@ export const load: PageServerLoad = async (event) => {
 
 		const detail = await loadItem(ctx.tx, event.params.id);
 		// RLS has already made "another business's item" and "no such item" the same answer.
-		if (!detail) error(404, { message: "We couldn't find that item." });
+		if (!detail) error(404, notFound('item'));
 
 		const [places, history, locations] = await Promise.all([
 			levelsForItem(ctx.tx, event.params.id),

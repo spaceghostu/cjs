@@ -40,7 +40,7 @@
 			<button
 				type="button"
 				onclick={onSearch}
-				class="flex h-[34px] w-full max-w-[380px] items-center gap-2 rounded-md border border-line-control bg-surface-card px-3 text-left text-ui text-ink-muted transition-colors duration-150 ease-out-forward outline-none hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+				class="flex h-[34px] w-full max-w-[380px] items-center gap-2 rounded-md border border-line-control bg-surface-card px-3 text-left text-ui text-ink-muted transition-colors duration-150 ease-out-forward outline-none hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 			>
 				<Search size={15} aria-hidden="true" class="shrink-0" />
 				<span class="min-w-0 flex-1 truncate">Search, or ask a question</span>

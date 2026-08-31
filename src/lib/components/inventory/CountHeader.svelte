@@ -22,7 +22,7 @@
 	 * updating is worse than no indicator at all.
 	 */
 	import Package from '@lucide/svelte/icons/package';
-	import { Stepper } from '$lib/ui';
+	import { Refusal, Stepper } from '$lib/ui';
 	import { COUNT_STEPS, countStartedLine, type CountStep } from '$lib/core/inventory';
 	import type { CountSaveStatus } from './count.svelte.js';
 
@@ -34,7 +34,8 @@
 		nowMs,
 		locale = 'en-ZA',
 		status = 'saved',
-		error = null
+		error = null,
+		onretry
 	}: {
 		/** "Stock count · July", from `countTitle`. */
 		title: string;
@@ -47,6 +48,11 @@
 		locale?: string;
 		status?: CountSaveStatus;
 		error?: string | null;
+		/**
+		 * A flush of the same batch that did not land. `CountAutosave` holds the in-flight
+		 * payload precisely so a failed save loses nothing, so this needs no new machinery.
+		 */
+		onretry?: () => void;
 	} = $props();
 
 	const started = $derived(countStartedLine(startedAtMs, nowMs, locale));
@@ -105,16 +111,13 @@
 </header>
 
 <!--
-	The failure, in full, where the person is looking. Announced rather than described, unlike a
-	field message: nothing has focus to describe it, and a save that did not happen is news.
+	The failure, in full, where the person is looking — and the reassurance beside it, because
+	`CountAutosave` holds the in-flight batch precisely so that nothing typed is lost when a save
+	does not land. The retry is a flush of that same batch. The argument for why this announces
+	while a field message does not now lives in `Refusal`'s own header, with the component.
 -->
 {#if error}
-	<p
-		class="mt-3 rounded-[10px] border border-wrong-border bg-wrong-tint px-4 py-3 text-ui text-wrong-ink"
-		aria-live="polite"
-	>
-		{error} Your work is still on this screen.
-	</p>
+	<Refusal message={`${error} Your work is still on this screen.`} {onretry} class="mt-3" />
 {/if}
 
 <Stepper

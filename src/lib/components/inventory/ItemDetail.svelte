@@ -92,8 +92,8 @@
 				<a
 					href="/inventory"
 					class="rounded-[5px] text-inventory-ink outline-none hover:underline
-						focus-visible:outline-2 focus-visible:outline-offset-2
-						focus-visible:outline-brand-focus-ring">Inventory</a
+						focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring
+						focus-visible:outline-solid">Inventory</a
 				>
 				{#if sku}
 					<span class="text-ink-muted" aria-hidden="true">/</span>

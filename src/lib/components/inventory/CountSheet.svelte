@@ -150,8 +150,8 @@
 						<button
 							type="button"
 							class="inline-flex items-center gap-1 rounded-sm text-ui text-brand-ink outline-none
-								hover:underline focus-visible:outline-2 focus-visible:outline-offset-2
-								focus-visible:outline-brand-focus-ring"
+								hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring
+								focus-visible:outline-solid"
 							aria-expanded={showMatched}
 							onclick={() => (showMatched = !showMatched)}
 						>

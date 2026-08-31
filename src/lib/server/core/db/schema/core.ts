@@ -60,8 +60,14 @@ export type MemberRole = (typeof memberRole.enumValues)[number];
  * Listed here rather than in each module because the counter table is shared, and because
  * a module that invented its own numbering would break the one guarantee a client cares
  * about: that `INV-1042` means exactly one document, forever.
+ *
+ * `job` is INTERNAL, the way `stock_count` is: `JOB-0001` is a handle the business uses on
+ * the phone to each other, where `INV-1042` is a handle a client and their accountant use.
+ * It is listed here anyway, and for the same reason as everything else on this line — the
+ * counter table is shared, and a module minting its own numbers is how a business ends up
+ * with two `JOB-0007`s and no way to tell which one the van was sent to.
  */
-export const DOCUMENT_TYPES = ['quote', 'invoice', 'credit_note', 'stock_count'] as const;
+export const DOCUMENT_TYPES = ['quote', 'invoice', 'credit_note', 'stock_count', 'job'] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
 export const business = pgTable(

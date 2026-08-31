@@ -138,6 +138,13 @@
 					<!--
 						The most recent entry's dot is settled green; the rest are inert. That is the
 						design's rule, and it does the work a "latest" label would otherwise need.
+
+						T27 §6, checked and closed: the distinction is redundant, not load-bearing. The
+						dot is `aria-hidden="true"`, and "newest" is already carried twice without any
+						colour — by ordinal position, since this is an <ol> ordered newest first, and by
+						the timestamp on the line below the entry's text. Read in greyscale, or by a
+						screen reader that never sees the dot at all, the timeline still says which
+						thing happened last.
 					-->
 					<span
 						class="mt-1.5 size-1.5 shrink-0 rounded-full {i === 0

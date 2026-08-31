@@ -14,6 +14,7 @@
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import { Refusal } from '$lib/ui';
 	import { QuoteEditor, SentQuote } from '$lib/components/quoting';
 	import type { PageData, ActionData } from './$types';
 
@@ -55,13 +56,13 @@
 		}}
 	></form>
 
+	<!--
+		Where a send that could not be sent surfaces — the 502 from `sendQuote` when the mail
+		transport refuses, and the two `CannotSendQuote` 422s. `Refusal` carries its own polite
+		live region, so the wrapping paragraph that used to carry one is gone rather than kept.
+	-->
 	{#if form?.message}
-		<p
-			class="mx-8 mt-4 rounded-[10px] border border-wrong-border bg-wrong-tint px-4 py-3 text-ui text-wrong-ink"
-			aria-live="polite"
-		>
-			{form.message}
-		</p>
+		<Refusal message={form.message} class="mx-8 mt-4" />
 	{/if}
 
 	<QuoteEditor
@@ -75,22 +76,21 @@
 		saveEndpoint="/quoting/{data.quote.id}/save"
 		promoteEndpoint="/quoting/{data.quote.id}/promote"
 		pdfHref="/documents/{data.quote.id}/pdf"
+		sourceItems={data.sourceItems}
 		{sending}
 		onsend={() => sendForm?.requestSubmit()}
 	>
 		{#snippet inventoryOffer()}
-			{#if data.inventoryAccess === 'write'}
-				<!--
-					The picker itself lands with Inventory (T23/T24). The seam is here now because a
-					boundary retrofitted after the first import has already crossed it is not a
-					boundary — and because the row has to read as "or pick from Inventory" the day
-					it works, without the table changing.
-				-->
-				<span class="text-ui text-ink-muted">pick from Inventory</span>
-			{:else}
+			<!--
+				The not-owned case only. When Inventory IS owned, `sourceItems` is non-null and
+				QuoteEditor renders the picker itself — this snippet never shows. The guard stays
+				because the two facts arrive as two fields, and a route that trusts them to agree
+				is a route that renders a dead link the day they do not.
+			-->
+			{#if data.inventoryAccess !== 'write'}
 				<a
 					href={resolve('/inventory')}
-					class="rounded-sm text-ui text-brand-ink underline underline-offset-2 outline-none hover:text-ink-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+					class="rounded-sm text-ui text-brand-ink underline underline-offset-2 outline-none hover:text-ink-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 				>
 					pick from Inventory
 				</a>

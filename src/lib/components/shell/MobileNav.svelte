@@ -24,6 +24,21 @@
 
 	let moreOpen = $state(false);
 
+	/**
+	 * The More button itself, so closing the sheet can put focus back on it.
+	 *
+	 * Every row in the sheet lives inside `{#if moreOpen}`, so closing it DESTROYS whatever
+	 * element the keyboard was on. Without this, the browser has nowhere to put focus and
+	 * drops it on <body>: the next Tab starts again from the top of the document, which for
+	 * someone who just navigated the whole nav to reach More is the entire journey again.
+	 */
+	let moreButton = $state<HTMLButtonElement | null>(null);
+
+	function closeMore(): void {
+		moreOpen = false;
+		moreButton?.focus();
+	}
+
 	/** More is lit when the route you are on lives under it. */
 	const overflowActive = $derived(nav.overflow.some((item) => isActive(pathname, item.href)));
 
@@ -37,7 +52,11 @@
 
 <svelte:window
 	onkeydown={(event) => {
-		if (event.key === 'Escape') moreOpen = false;
+		// Guarded on `moreOpen`, not just on the key. This listener is on the WINDOW and the
+		// nav is mounted on every phone route, so an unguarded handler would yank focus onto
+		// the More button every time anyone pressed Escape anywhere in the product — closing
+		// a dialog, clearing a search field, abandoning a menu that has nothing to do with us.
+		if (event.key === 'Escape' && moreOpen) closeMore();
 	}}
 />
 
@@ -45,12 +64,20 @@
 	<!--
 		A plain scrim, not a dialog: the sheet below is a nav list, and trapping focus in it
 		would make the bottom bar itself unreachable while it is open.
+
+		`tabindex="-1"` because it is a pointer affordance only. It is `fixed inset-0`, so the
+		2px ring at 2px offset that every other control here carries would draw a rectangle
+		around the whole viewport — and it would be the FIRST thing Tab reached, since the
+		scrim precedes the nav in the document. Keyboard users close the sheet with Escape,
+		which the handler above already does, or by tabbing past it. Nothing is lost by taking
+		it out of the tab order; the click target stays exactly as it was.
 	-->
 	<button
 		type="button"
+		tabindex="-1"
 		aria-label="Close menu"
 		class="fixed inset-0 z-30 bg-surface-base/70"
-		onclick={() => (moreOpen = false)}
+		onclick={closeMore}
 	></button>
 {/if}
 
@@ -58,52 +85,6 @@
 	aria-label="Sections"
 	class="relative z-40 border-t border-line-subtle bg-surface-sunken pt-2 pr-1 pb-3.5 pl-1"
 >
-	{#if moreOpen}
-		<div
-			class="absolute right-2 bottom-full left-2 mb-2 overflow-hidden rounded-xl border border-line-strong bg-surface-overlay"
-		>
-			{#each nav.overflow as item (item.key)}
-				{@const Icon = navIcon(item.key)}
-				<a
-					href={item.href}
-					onclick={() => (moreOpen = false)}
-					class="flex h-11 items-center gap-3 border-b border-line-row px-4 text-ui text-ink"
-				>
-					<Icon size={18} aria-hidden="true" class="text-ink-muted" />
-					<span class="flex-1">{item.label}</span>
-					{#if item.access === 'none'}
-						<span class="text-helper text-brand-ink">Add</span>
-					{:else if item.access === 'read'}
-						<span class="text-helper text-ink-muted">Read-only</span>
-					{/if}
-				</a>
-			{/each}
-			{#each PLATFORM_ITEMS as row (row.href)}
-				<a
-					href={row.href}
-					data-sveltekit-reload={row.reload ? true : undefined}
-					onclick={() => (moreOpen = false)}
-					class="flex h-11 items-center px-4 text-ui text-ink-secondary not-last:border-b not-last:border-line-row"
-				>
-					{row.label}
-				</a>
-			{/each}
-
-			<!--
-				A POST, not a link — see `sign-out/+page.server.ts`. A GET that ends a session can
-				fire from a prefetch or a link scanner, so this is the one row here that is a form.
-			-->
-			<form method="POST" action="/sign-out" class="border-t border-line-row">
-				<button
-					type="submit"
-					class="flex h-11 w-full items-center px-4 text-left text-ui text-ink-secondary"
-				>
-					Sign out
-				</button>
-			</form>
-		</div>
-	{/if}
-
 	<ul class="flex items-stretch">
 		{#each nav.items as item (item.key)}
 			{@const active = isActive(pathname, item.href)}
@@ -112,7 +93,7 @@
 				<a
 					href={item.href}
 					aria-current={active ? 'page' : undefined}
-					class="flex h-11 flex-col items-center justify-center gap-1"
+					class="flex h-11 flex-col items-center justify-center gap-1 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 					class:text-ink={active}
 					class:font-medium={active}
 					class:text-ink-muted={!active}
@@ -130,10 +111,11 @@
 		-->
 		<li class="flex-1">
 			<button
+				bind:this={moreButton}
 				type="button"
 				aria-expanded={moreOpen}
 				onclick={() => (moreOpen = !moreOpen)}
-				class="flex h-11 w-full flex-col items-center justify-center gap-1"
+				class="flex h-11 w-full flex-col items-center justify-center gap-1 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 				class:text-ink={moreOpen || overflowActive}
 				class:font-medium={moreOpen || overflowActive}
 				class:text-ink-muted={!moreOpen && !overflowActive}
@@ -143,4 +125,70 @@
 			</button>
 		</li>
 	</ul>
+
+	<!--
+		The sheet comes AFTER the bar in the document, which is the whole reason it is down
+		here rather than above the <ul> where it started.
+
+		It is `absolute bottom-full` against a `relative` <nav>, so where it PAINTS has nothing
+		to do with where it sits in the markup — it renders above the bar either way, and a
+		later sibling paints on top, which is the safer of the two orders. What sibling order
+		decides is the tab sequence. Declared first, the sheet preceded the button that opens
+		it: pressing Enter on More opened a menu that forward-Tab could never reach, because
+		Tab went on past the nav entirely and the rows were only reachable by shift-Tabbing
+		back over More and all four destination links. Declared last, Tab from More lands on
+		the first row, which is what someone who just opened a menu is asking for.
+
+		The rows below close the sheet with a bare `moreOpen = false` rather than by calling
+		`closeMore()`, and the difference is deliberate. Escape and the scrim are DISMISSALS:
+		the person is staying where they are, so the sheet has to hand focus back to the
+		button they opened it from or it lands on nothing. A row is a DEPARTURE — they are
+		going somewhere else, and pulling focus back onto More on the way out would fight the
+		destination for it.
+	-->
+	{#if moreOpen}
+		<div
+			class="absolute right-2 bottom-full left-2 mb-2 overflow-hidden rounded-xl border border-line-strong bg-surface-overlay"
+		>
+			{#each nav.overflow as item (item.key)}
+				{@const Icon = navIcon(item.key)}
+				<a
+					href={item.href}
+					onclick={() => (moreOpen = false)}
+					class="flex h-11 items-center gap-3 border-b border-line-row px-4 text-ui text-ink outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
+				>
+					<Icon size={18} aria-hidden="true" class="text-ink-muted" />
+					<span class="flex-1">{item.label}</span>
+					{#if item.access === 'none'}
+						<span class="text-helper text-brand-ink">Add</span>
+					{:else if item.access === 'read'}
+						<span class="text-helper text-ink-muted">Read-only</span>
+					{/if}
+				</a>
+			{/each}
+			{#each PLATFORM_ITEMS as row (row.href)}
+				<a
+					href={row.href}
+					data-sveltekit-reload={row.reload ? true : undefined}
+					onclick={() => (moreOpen = false)}
+					class="flex h-11 items-center px-4 text-ui text-ink-secondary outline-none not-last:border-b not-last:border-line-row focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
+				>
+					{row.label}
+				</a>
+			{/each}
+
+			<!--
+				A POST, not a link — see `sign-out/+page.server.ts`. A GET that ends a session can
+				fire from a prefetch or a link scanner, so this is the one row here that is a form.
+			-->
+			<form method="POST" action="/sign-out" class="border-t border-line-row">
+				<button
+					type="submit"
+					class="flex h-11 w-full items-center px-4 text-left text-ui text-ink-secondary outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
+				>
+					Sign out
+				</button>
+			</form>
+		</div>
+	{/if}
 </nav>

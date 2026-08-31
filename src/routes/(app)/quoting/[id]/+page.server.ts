@@ -17,6 +17,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { effectiveStatus, issuerFrom, priceQuote, quoteDocument, todayIn } from '$lib/core/quoting';
+import { notFound, notFoundMessage } from '$lib/core/refusals';
 import { withModule } from '$lib/server/core/ctx';
 import { business as businessTable } from '$lib/server/core/db/schema/core';
 import { modulePrice, totalWith } from '$lib/server/core/modules/catalogue';
@@ -30,6 +31,7 @@ import {
 } from '$lib/server/modules/quoting/queries';
 import { CannotSendQuote, sendQuote } from '$lib/server/modules/quoting/send';
 import { createFromQuote, invoiceForQuote } from '$lib/server/modules/invoicing/public';
+import { listPickableItems } from '$lib/server/modules/inventory/public';
 import { loadQuoteLineRows } from '$lib/server/modules/quoting/queries';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -39,7 +41,7 @@ export const load: PageServerLoad = async (event) => {
 
 		// RLS has already made "another business's quote" and "no such quote" the same answer,
 		// which is exactly what they should be to somebody guessing at URLs.
-		if (!quote) error(404, { message: "We couldn't find that quote." });
+		if (!quote) error(404, notFound('quote'));
 
 		const [businessRow] = await ctx.tx
 			.select()
@@ -124,7 +126,15 @@ export const load: PageServerLoad = async (event) => {
 			// them gets it. Reserving on open would burn a number per abandoned draft.
 			provisionalNumber: quote.number ? null : await provisionalNumber(ctx.tx),
 			/** Drives the add-line row: the picker when Inventory is owned, T13's offer when not. */
-			inventoryAccess: ctx.access.inventory
+			inventoryAccess: ctx.access.inventory,
+			/**
+			 * What the picker offers, loaded once at page open through Inventory's public
+			 * surface — the composition a ROUTE is allowed that a module is not. A price that
+			 * changes between load and pick is by design: the price is a snapshot the person
+			 * can edit, not a live link. Null when Inventory is not owned; the editor then
+			 * renders the caller's T13 offer instead.
+			 */
+			sourceItems: ctx.access.inventory === 'write' ? await listPickableItems(ctx.tx) : null
 		};
 	});
 };
@@ -164,7 +174,7 @@ export const actions: Actions = {
 				const quote = await loadQuote(ctx.tx, event.params.id);
 				// `CannotSendQuote` rather than `error(404)`: a thrown redirect/error inside this
 				// try would be swallowed by the catch below and re-reported as a 500.
-				if (!quote) throw new CannotSendQuote("We couldn't find that quote.");
+				if (!quote) throw new CannotSendQuote(notFoundMessage('quote'));
 
 				if (quote.status !== 'accepted') {
 					throw new CannotSendQuote(
@@ -181,6 +191,10 @@ export const actions: Actions = {
 				return createFromQuote(ctx.tx, ctx.business, {
 					quoteId: quote.id,
 					quoteNumber: quote.number,
+					// The row is already loaded two lines above and carries the column, so the
+					// job travels onto the invoice for the cost of reading a field. Null is the
+					// ordinary case for a quote accepted before SPA-20 existed.
+					jobId: row?.jobId ?? null,
 					customerId: quote.customer.customerId,
 					customer: {
 						name: quote.customer.name,

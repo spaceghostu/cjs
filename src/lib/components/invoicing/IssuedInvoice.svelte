@@ -22,7 +22,7 @@
 	 * The desktop leads with the document, because on a laptop the question is *what did we send
 	 * them*.
 	 */
-	import { Amount, Badge, Button } from '$lib/ui';
+	import { Amount, Badge, Button, Refusal } from '$lib/ui';
 	import { DocumentSheet } from '$lib/components/document';
 	import {
 		REVERSAL_WINDOW_DAYS,
@@ -117,7 +117,11 @@
 	<div class="flex flex-wrap items-start justify-between gap-4">
 		<div class="min-w-0">
 			<p class="flex items-center gap-1.5 text-helper">
-				<a href="/invoicing" class="text-invoicing-ink hover:underline">Invoicing</a>
+				<a
+					href="/invoicing"
+					class="text-invoicing-ink outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
+					>Invoicing</a
+				>
 				<span class="text-decoration-quiet" aria-hidden="true">/</span>
 				<span class="numeric text-ink-muted">{document.number}</span>
 			</p>
@@ -145,13 +149,14 @@
 		{/if}
 	</div>
 
+	<!--
+		No retry offered here. Everything that surfaces on an issued invoice is an ACTION refusal
+		— a reminder that would not send, a payment reversal the server declined — and the
+		action's own button is already the retry. A second one beside the sentence would only
+		raise the question of which to press.
+	-->
 	{#if message}
-		<p
-			class="mt-4 rounded-[10px] border border-wrong-border bg-wrong-tint px-4 py-3 text-ui text-wrong-ink"
-			aria-live="polite"
-		>
-			{message}
-		</p>
+		<Refusal {message} class="mt-4" />
 	{/if}
 
 	<div class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8">
@@ -232,7 +237,7 @@
 					<a
 						href="/documents/{invoiceId}/pdf"
 						data-sveltekit-reload
-						class="text-[13px] text-ink-secondary underline-offset-2 hover:underline"
+						class="text-[13px] text-ink-secondary underline-offset-2 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 					>
 						Download PDF
 					</a>

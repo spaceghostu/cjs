@@ -29,6 +29,7 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { formatZar } from '$lib/core/money';
+import { notFoundMessage } from '$lib/core/refusals';
 import { issuerFrom } from '$lib/core/quoting';
 import { formatDocumentDate, todayIn } from '$lib/core/calendar';
 import { invoiceDocument, priceInvoice } from '$lib/core/invoicing';
@@ -85,7 +86,7 @@ export async function issueInvoice(
 	now: Date = new Date()
 ): Promise<IssueResult> {
 	const draft = await loadInvoice(tx, invoiceId);
-	if (!draft) throw new CannotIssueInvoice("We couldn't find that invoice.");
+	if (!draft) throw new CannotIssueInvoice(notFoundMessage('invoice'));
 
 	if (draft.status !== 'draft') {
 		throw new CannotIssueInvoice(
@@ -226,7 +227,7 @@ export async function sendReminder(
 	now: Date = new Date()
 ): Promise<{ readonly sentTo: string }> {
 	const header = await loadInvoiceRow(tx, invoiceId);
-	if (!header) throw new CannotIssueInvoice("We couldn't find that invoice.");
+	if (!header) throw new CannotIssueInvoice(notFoundMessage('invoice'));
 
 	if (header.status === 'draft') {
 		throw new CannotIssueInvoice(

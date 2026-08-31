@@ -66,7 +66,7 @@
 			-->
 			<button
 				type="submit"
-				class="rounded-md text-[13px] font-medium text-brand-ink outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+				class="rounded-md text-[13px] font-medium text-brand-ink outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 			>
 				Undo
 			</button>
@@ -79,7 +79,7 @@
 		<button
 			type="button"
 			onclick={onclose}
-			class="rounded-md text-[13px] text-ink-muted outline-none hover:text-ink-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+			class="rounded-md text-[13px] text-ink-muted outline-none hover:text-ink-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 		>
 			Dismiss
 		</button>

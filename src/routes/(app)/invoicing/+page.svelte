@@ -8,6 +8,7 @@
 	 *   write  owned        — the module.
 	 */
 	import { enhance } from '$app/forms';
+	import { Refusal } from '$lib/ui';
 	import { InvoiceList } from '$lib/components/invoicing';
 	import { LockedModule, RemovedModule } from '$lib/components/modules';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
@@ -107,12 +108,7 @@
 
 	{#if form?.message}
 		<div class="mx-auto w-full max-w-6xl px-4 pt-4 lg:px-8">
-			<p
-				class="rounded-[10px] border border-wrong-border bg-wrong-tint px-4 py-3 text-ui text-wrong-ink"
-				aria-live="polite"
-			>
-				{form.message}
-			</p>
+			<Refusal message={form.message} />
 		</div>
 	{/if}
 

@@ -30,6 +30,7 @@ import {
 	formatWeekdayDate,
 	type CalendarDate
 } from '$lib/core/calendar';
+import type { InvoiceFilter } from './filter';
 import type { InvoiceStatus } from './types';
 
 /**
@@ -250,4 +251,31 @@ export function openCountPhrase(count: number): string {
 	if (count <= 1) return 'Once';
 	if (count === 2) return 'Twice';
 	return `${capitalise(countWord(count))} times`;
+}
+
+/**
+ * THE TWO EMPTY STATES, WHICH ARE NOT THE SAME STATE.
+ *
+ * The same distinction inventory's `emptyCopy` draws, and it belongs here for the same reason:
+ * SPA-13 shares the SURFACE across the modules and leaves each module's WORDS with the module.
+ * A business with no invoices at all needs a way out of that — start one, and here is what will
+ * happen when you do. A business with forty invoices and an "Overdue" tab showing none needs
+ * nothing offered at all; it has just been told good news, and a "New invoice" button under it
+ * would be the interface misreading that as a lack.
+ *
+ * The screen branches on the COUNTS to tell them apart, never on the visible rows and never on
+ * which tab is showing — `InvoiceList` did the latter until SPA-13, which got it wrong in both
+ * directions at once. *
+ * THE `'all'` STRING IS THE BODY OF A PANEL THAT ALREADY HAS A HEADING, and it is written to sit
+ * UNDER one rather than to open with the same words. `EmptyState` renders "Nothing invoiced yet" above it, and a
+ * body that began by repeating that would be the interface saying the same thing twice to fill a
+ * slot — the thing `$lib/components/state/ErrorState.svelte` states as a rule for the layer
+ * these panels belong to. The other branches are `NoMatches` messages, which have no heading
+ * above them and therefore have to carry their own subject.
+ */
+export function emptyCopy(filter: InvoiceFilter): string {
+	if (filter === 'all') {
+		return 'Start one and it will save as you go — you can close it and come back.';
+	}
+	return 'Nothing here. That is usually good news.';
 }

@@ -26,7 +26,8 @@
 		pdfHref,
 		sending = false,
 		canSend,
-		onsend
+		onsend,
+		onretry
 	}: {
 		clientName: string | null;
 		status: SaveStatus;
@@ -37,6 +38,8 @@
 		/** False while the quote is missing something a client would need. */
 		canSend: boolean;
 		onsend: () => void;
+		/** Forwarded to `SaveState`, which offers it only while a save has actually failed. */
+		onretry?: () => void;
 	} = $props();
 
 	const Icon = navIcon('quoting');
@@ -55,7 +58,7 @@
 			</h1>
 
 			<div class="mt-2">
-				<SaveState {status} {savedAtMs} {error} />
+				<SaveState {status} {savedAtMs} {error} {onretry} />
 			</div>
 		</div>
 

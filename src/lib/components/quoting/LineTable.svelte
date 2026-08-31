@@ -80,7 +80,7 @@
 						than a document to compose.
 					-->
 					<input
-						class="w-full bg-transparent text-ui text-ink outline-none placeholder:text-ink-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+						class="w-full bg-transparent text-ui text-ink outline-none placeholder:text-ink-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 						placeholder="What are you quoting for?"
 						aria-label="Item {i + 1} description"
 						bind:value={line.description}
@@ -120,7 +120,7 @@
 					{/if}
 					<button
 						type="button"
-						class="rounded-sm p-1 text-ink-muted outline-none hover:text-wrong-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+						class="rounded-sm p-1 text-ink-muted outline-none hover:text-wrong-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 						aria-label="Remove item {i + 1}"
 						onclick={() => onremove(line.id)}
 					>
@@ -143,7 +143,7 @@
 		<div class="flex flex-wrap items-center gap-x-2 gap-y-3 px-3 py-2.5">
 			<button
 				type="button"
-				class="flex items-center gap-1.5 rounded-sm text-ui text-brand-ink outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+				class="flex items-center gap-1.5 rounded-sm text-ui text-brand-ink outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 				onclick={onadd}
 			>
 				<Plus size={15} aria-hidden="true" />

@@ -35,7 +35,12 @@ const DEFAULTS: Record<DocumentType, { prefix: string; start: number; pad: numbe
 	quote: { prefix: 'QT', start: 1001, pad: 4 },
 	invoice: { prefix: 'INV', start: 1001, pad: 4 },
 	credit_note: { prefix: 'CN', start: 1001, pad: 4 },
-	stock_count: { prefix: 'SC', start: 1, pad: 4 }
+	stock_count: { prefix: 'SC', start: 1, pad: 4 },
+	// `start: 1` rather than 1001, matching `stock_count` and for its stated reason: a burnt
+	// `INV-1043` is a gap an accountant asks about, so an invoice sequence starts high enough
+	// to look established. `JOB-0001` is internal, nobody outside the business ever sees it,
+	// and a first job numbered 1001 would be a small lie told to nobody.
+	job: { prefix: 'JOB', start: 1, pad: 4 }
 };
 
 export type DocumentNumber = {

@@ -27,6 +27,7 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { formatZar } from '$lib/core/money';
+import { notFoundMessage } from '$lib/core/refusals';
 import { issuerFrom, priceQuote, quoteDocument, todayIn } from '$lib/core/quoting';
 import { allocateDocumentNumber } from '$lib/server/core/db/numbering';
 import { business as businessTable } from '$lib/server/core/db/schema/core';
@@ -90,7 +91,7 @@ export async function sendQuote(
 	now: Date = new Date()
 ): Promise<SendResult> {
 	const draft = await loadQuote(tx, quoteId);
-	if (!draft) throw new CannotSendQuote("We couldn't find that quote.");
+	if (!draft) throw new CannotSendQuote(notFoundMessage('quote'));
 
 	if (draft.status !== 'draft') {
 		throw new CannotSendQuote(

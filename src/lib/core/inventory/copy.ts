@@ -434,12 +434,18 @@ export function standingSentence(
  * SPA-6 makes this an acceptance criterion, and the difference is real: a module with no items
  * needs a way out of itself, and a filter that matched nothing needs no action at all. Offering
  * "New item" under an empty "Running low" tab would be the interface misreading good news as a
- * lack.
+ * lack. *
+ * THE `'all'` STRING IS THE BODY OF A PANEL THAT ALREADY HAS A HEADING, and it is written to sit
+ * UNDER one rather than to open with the same words. `EmptyState` renders "Nothing in your stock yet" above it, and a
+ * body that began by repeating that would be the interface saying the same thing twice to fill a
+ * slot — the thing `$lib/components/state/ErrorState.svelte` states as a rule for the layer
+ * these panels belong to. The other branches are `NoMatches` messages, which have no heading
+ * above them and therefore have to carry their own subject.
  */
 export function emptyCopy(filter: 'all' | 'low' | 'archived'): string {
 	switch (filter) {
 		case 'all':
-			return 'Nothing in stock yet. Add your first item and its quantity will follow every movement from here on.';
+			return 'Add your first item and its quantity will follow every movement from here on.';
 		case 'low':
 			return 'Nothing running low. That is usually good news.';
 		case 'archived':

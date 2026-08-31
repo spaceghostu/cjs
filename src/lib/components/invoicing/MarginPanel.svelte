@@ -58,10 +58,16 @@
 
 		<p class="mt-3 text-helper text-ink-muted">
 			{marginFootnote(fromInventory)}
+			<!--
+				Underlined always, not on hover: this link sits inside a sentence, so colour is
+				the only other thing separating it from the words around it — which is exactly
+				what WCAG 1.4.1 refuses (axe: link-in-text-block). The standalone links on this
+				screen may keep hover underlines; a link IN a text block may not.
+			-->
 			<a
 				href={workingsHref}
-				class="text-brand-ink underline-offset-2 hover:underline focus-visible:outline-2
-					focus-visible:outline-offset-2 focus-visible:outline-brand-focus-ring"
+				class="text-brand-ink underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2
+					focus-visible:outline-brand-focus-ring focus-visible:outline-solid"
 			>
 				See the workings.
 			</a>

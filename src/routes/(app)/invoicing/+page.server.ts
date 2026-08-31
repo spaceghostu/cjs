@@ -30,6 +30,7 @@ import {
 	type SortDirection
 } from '$lib/core/invoicing';
 import { todayIn } from '$lib/core/calendar';
+import { notFoundMessage } from '$lib/core/refusals';
 import { priceInvoice, settle } from '$lib/core/invoicing';
 import { zero } from '$lib/core/money';
 import {
@@ -216,7 +217,7 @@ export const actions: Actions = {
 				// THROWN, not returned. A `fail()` returned from inside `withModule` is just what
 				// the callback resolves to — the action would ignore it and go on to report
 				// "paid" having written nothing at all.
-				if (!invoice) throw new CannotDoThat("We couldn't find that invoice.");
+				if (!invoice) throw new CannotDoThat(notFoundMessage('invoice'));
 
 				const { outstanding } = settle(priceInvoice(invoice).total, payments);
 				if (outstanding.cents <= 0) {

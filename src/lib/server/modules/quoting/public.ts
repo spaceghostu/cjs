@@ -6,6 +6,9 @@
  * one is not owned". Home was the first caller and takes the summary; the documents route is
  * the second and takes the printable document.
  *
+ * The third caller is the jobs derivation in `server/core/jobs/queries.ts`, which needs to know
+ * what a job has been quoted without reaching into Quoting's queries to find out.
+ *
  * The seam existed before the module did, on purpose. A boundary retrofitted after the first
  * import has already crossed it is not a boundary.
  *
@@ -15,3 +18,4 @@
  */
 export { summariseQuoting } from './summary';
 export { printableQuote } from './printable';
+export { quotesForJob } from './queries';

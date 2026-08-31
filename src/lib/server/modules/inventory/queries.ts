@@ -34,6 +34,7 @@ import type {
 	InventoryListItem,
 	InventorySort,
 	MovementReason,
+	PickableItem,
 	SortDirection,
 	StockCountStatus
 } from '$lib/core/inventory';
@@ -374,6 +375,38 @@ export async function loadItem(tx: Tx, itemId: string): Promise<ItemDetailRow | 
 		placeCount: row.placeCount,
 		lastMovedOn: row.lastMovedOn
 	};
+}
+
+/**
+ * WHAT THE QUOTE EDITOR MAY PICK FROM. Exposed through `public.ts` — the door SPA-10 walks
+ * through — and shaped for the pick, not for this module's own screens.
+ *
+ * NO JOIN TO `inventory_level`, deliberately. The picker shows no stock figure, because a
+ * figure would imply picking reserves it — and nothing moves at quote time. Items with no
+ * recorded sell price are included; the picker leaves the price field for the person to type.
+ */
+export async function listPickableItems(tx: Tx): Promise<readonly PickableItem[]> {
+	const rows = await tx
+		.select({
+			id: item.id,
+			name: item.name,
+			sku: item.sku,
+			unit: item.unit,
+			sellMicros: item.sellMicros,
+			currency: item.currency
+		})
+		.from(item)
+		.where(isNull(item.archivedAt))
+		.orderBy(asc(item.name), asc(item.id))
+		.limit(MAX_PAGE_SIZE);
+
+	return rows.map((row) => ({
+		id: row.id,
+		name: row.name,
+		sku: row.sku,
+		unitOfMeasure: row.unit,
+		sellPrice: toUnitPriceOrNull(row.sellMicros, row.currency)
+	}));
 }
 
 /** Where one item actually is, a row per place. Straight from the view. */

@@ -22,6 +22,7 @@ export type {
 	InventoryLocation,
 	InventoryMovement,
 	MovementReason,
+	PickableItem,
 	StockCount,
 	StockCountLine,
 	StockCountStatus

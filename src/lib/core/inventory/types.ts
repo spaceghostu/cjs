@@ -142,6 +142,25 @@ export type InventoryItem = {
 };
 
 /**
+ * An item as the QUOTE EDITOR's picker is offered it. Client-safe, like everything here.
+ *
+ * The subset of `InventoryItem` a pick actually snapshots, plus the `sku` a person searches
+ * by. `sellPrice` is a `UnitPrice | null` for the same reason the full type's is — "we have
+ * not recorded what this sells for" is a real state and not zero, and the picker leaves the
+ * price field for the person to type.
+ *
+ * DELIBERATELY no `description`: a pick copies nothing onto the client-facing document
+ * (`lineFromItem` in quoting's core says why), so the picker has no business carrying it.
+ */
+export type PickableItem = {
+	readonly id: string;
+	readonly name: string;
+	readonly sku: string | null;
+	readonly unitOfMeasure: string;
+	readonly sellPrice: UnitPrice | null;
+};
+
+/**
  * One change to one item in one place. Append-only, at the database as well as here.
  *
  * `qty` is SIGNED: stock arriving is positive, stock leaving is negative. One column rather than

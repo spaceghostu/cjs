@@ -19,6 +19,7 @@ import { eq } from 'drizzle-orm';
 import { issuerFrom } from '$lib/core/quoting';
 import { todayIn } from '$lib/core/calendar';
 import { checkAmount } from '$lib/core/validation';
+import { notFound } from '$lib/core/refusals';
 import {
 	canReverse,
 	effectiveInvoiceStatus,
@@ -57,7 +58,7 @@ export const load: PageServerLoad = async (event) => {
 
 		// RLS has already made "another business's invoice" and "no such invoice" the same answer,
 		// which is exactly what they should be to somebody guessing at URLs.
-		if (!invoice) error(404, { message: "We couldn't find that invoice." });
+		if (!invoice) error(404, notFound('invoice'));
 
 		const [businessRow] = await ctx.tx
 			.select()

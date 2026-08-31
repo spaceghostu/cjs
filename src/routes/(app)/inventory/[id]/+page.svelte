@@ -5,6 +5,7 @@
 	 * No access branch here, unlike the list. This route lets `withModule` refuse — see the header
 	 * comment on `+page.server.ts` for why the detail is `write` where the list is `read`.
 	 */
+	import { Refusal } from '$lib/ui';
 	import { ItemDetail, ItemDialog } from '$lib/components/inventory';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import type { ActionData, PageData } from './$types';
@@ -30,12 +31,7 @@
 
 {#if form?.message}
 	<div class="mx-auto w-full max-w-5xl px-4 pt-4 lg:px-8">
-		<p
-			class="rounded-[10px] border border-wrong-border bg-wrong-tint px-4 py-3 text-ui text-wrong-ink"
-			aria-live="polite"
-		>
-			{form.message}
-		</p>
+		<Refusal message={form.message} />
 	</div>
 {/if}
 

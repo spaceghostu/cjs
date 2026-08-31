@@ -179,6 +179,41 @@ export const invoice = pgTable(
 		sourceQuoteId: uuid(),
 		sourceQuoteNumber: text(),
 
+		/**
+		 * THE WORK THIS INVOICE BILLS FOR — `core_job`.
+		 *
+		 * Deliberately no `.references()`: the foreign key is COMPOSITE,
+		 * `(business_id, job_id) -> core_job (business_id, id)`, hand-written in
+		 * `drizzle/0010_jobs_platform.sql` because Postgres checks referential integrity with row
+		 * security bypassed and a single-column key would accept another tenant's job. Unlike
+		 * `source_quote_id` immediately above, this IS a real constraint — a quote belongs to a
+		 * module a business may remove, and `core_job` is floor that never goes away.
+		 *
+		 * NULLABLE, PERMANENTLY, and not migration debris: a walk-in counter sale and a monthly
+		 * maintenance invoice are both invoices with no job behind them, and always will be.
+		 *
+		 * MANY INVOICES TO ONE JOB, with no constraint saying otherwise, because phased billing —
+		 * deposit, progress, final — is one job and three invoices. The commercial derivation in
+		 * `$lib/core/jobs/commercial.ts` sums them; nothing here needs to know how many there are.
+		 *
+		 * NOT FROZEN ON ISSUE, deliberately. `app.freeze_issued_invoice` in
+		 * `drizzle/0007_invoicing.sql` enumerates the columns an issued invoice may not change,
+		 * and `job_id` is not among them. The reason is not that frozen columns are the printed
+		 * ones — `source_quote_id`, `business_id`, `id`, `created_at` and `archived_at` are all
+		 * frozen and none of them is printed. It is that `source_quote_id` records where the
+		 * document CAME FROM and is fixed at the moment of creation, whereas attaching an already
+		 * issued walk-in invoice to a job is a workflow the product wants to allow.
+		 *
+		 * Noted while reading that trigger, because the next person to add a column here will be
+		 * misled by it: its comment says it is written as an ALLOW-LIST so that "a column added in
+		 * a later migration is then frozen by default", but the implementation enumerates the
+		 * FROZEN columns in `v_frozen`, so a new column is in fact MUTABLE by default.
+		 * `app.freeze_applied_count` in `0008` repeats the wording with the same implementation.
+		 * The outcome we want here is the one we get; the comment is wrong about why. Changing
+		 * freeze semantics on tax records is its own change, with its own tests.
+		 */
+		jobId: uuid(),
+
 		/** THE PRICING CONTRACT, SNAPSHOTTED. See `quoting.ts` — the same discipline, higher stakes. */
 		pricingMode: text().notNull().default('exclusive'),
 		taxEngine: text().notNull().default('za_vat'),
@@ -336,7 +371,10 @@ export const invoice = pgTable(
 		index('invoicing_invoice_customer_idx').on(t.businessId, t.customerId),
 		// "Created from quote QT-1036", asked the other way round: T18's accepted quote needs to
 		// know whether it has already been invoiced.
-		index('invoicing_invoice_source_quote_idx').on(t.businessId, t.sourceQuoteId)
+		index('invoicing_invoice_source_quote_idx').on(t.businessId, t.sourceQuoteId),
+
+		// The jobs derivation asks "what has this job been billed?" and nothing else.
+		index('invoicing_invoice_job_idx').on(t.businessId, t.jobId)
 	]
 );
 

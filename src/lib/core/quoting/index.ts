@@ -55,6 +55,7 @@ export {
 	depositIssue,
 	differencesFromRecord,
 	editorFromQuote,
+	lineFromItem,
 	patchFromEditor,
 	priceIssue,
 	qtyIssue,
@@ -62,7 +63,7 @@ export {
 } from './editor';
 export type { EditorDeposit, EditorLine, EditorState, FieldDifference } from './editor';
 
-export { PROMOTABLE_FIELDS } from './wire';
+export { DESCRIPTION_MAX, PROMOTABLE_FIELDS } from './wire';
 export type {
 	CustomerPatch,
 	DepositPatch,

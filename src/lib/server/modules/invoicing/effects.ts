@@ -17,6 +17,7 @@
  */
 import { and, eq, isNull, notInArray, sql } from 'drizzle-orm';
 import { VAT_POLICY, type Money } from '$lib/core/money';
+import { notFoundMessage } from '$lib/core/refusals';
 import { STANDARD_VAT_RATE_PPM } from '$lib/core/quoting';
 import { addDays, todayIn, type CalendarDate } from '$lib/core/calendar';
 import {
@@ -117,6 +118,18 @@ export async function createFromQuote(
 	source: {
 		readonly quoteId: string;
 		readonly quoteNumber: string | null;
+		/**
+		 * The job the quote was for, if it had one.
+		 *
+		 * An invoice raised from a quote inherits the quote's job the same way it inherits
+		 * `source_quote_id` — and unlike `source_quote_id`, this link is a real (composite)
+		 * foreign key, because `core_job` is floor and is never removed with a module.
+		 *
+		 * This is the only quote-to-invoice path in the product, so without it no invoice in the
+		 * running system would ever carry a job, and `jobCommercialState` could never leave
+		 * `accepted` — while every hand-linked test fixture went on passing.
+		 */
+		readonly jobId: string | null;
 		readonly customerId: string | null;
 		readonly customer: Record<string, string | null>;
 		readonly sendToName: string | null;
@@ -165,6 +178,7 @@ export async function createFromQuote(
 			dueDate: addDays(today, settings.paymentTermsDays),
 			sourceQuoteId: source.quoteId,
 			sourceQuoteNumber: source.quoteNumber,
+			jobId: source.jobId,
 			pricingMode: source.pricingMode,
 			taxEngine: source.taxEngine,
 			vatRatePpm: source.vatRatePpm,
@@ -228,7 +242,7 @@ export async function duplicateInvoice(
 	const { now = new Date() } = options;
 
 	const source = await loadInvoiceRow(tx, invoiceId);
-	if (!source) throw new CannotDoThat("We couldn't find that invoice.");
+	if (!source) throw new CannotDoThat(notFoundMessage('invoice'));
 
 	const settings = await loadSettings(tx);
 	const today = todayIn(now);
@@ -483,7 +497,7 @@ export async function recordPayment(
 	now: Date = new Date()
 ): Promise<{ readonly settled: boolean; readonly outstanding: Money }> {
 	const header = await loadInvoiceRow(tx, invoiceId);
-	if (!header) throw new CannotDoThat("We couldn't find that invoice.");
+	if (!header) throw new CannotDoThat(notFoundMessage('invoice'));
 
 	if (header.status === 'draft') {
 		throw new CannotDoThat('That invoice has not been issued yet, so nothing is owed on it.');
@@ -561,11 +575,11 @@ export async function reversePayment(
 	now: Date = new Date()
 ): Promise<{ readonly settled: boolean; readonly outstanding: Money }> {
 	const header = await loadInvoiceRow(tx, invoiceId);
-	if (!header) throw new CannotDoThat("We couldn't find that invoice.");
+	if (!header) throw new CannotDoThat(notFoundMessage('invoice'));
 
 	const payments = await loadPayments(tx, invoiceId);
 	const original = payments.find((p) => p.id === paymentId);
-	if (!original) throw new CannotDoThat("We couldn't find that payment.");
+	if (!original) throw new CannotDoThat(notFoundMessage('payment'));
 
 	const alreadyReversed = payments.some((p) => p.reversesPaymentId === paymentId);
 	const verdict = canReverse(original, alreadyReversed, now);
@@ -661,7 +675,7 @@ export async function cancelInvoice(
 	now: Date = new Date()
 ): Promise<void> {
 	const header = await loadInvoiceRow(tx, invoiceId);
-	if (!header) throw new CannotDoThat("We couldn't find that invoice.");
+	if (!header) throw new CannotDoThat(notFoundMessage('invoice'));
 
 	if (header.status === 'draft') {
 		throw new CannotDoThat(

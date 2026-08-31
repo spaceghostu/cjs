@@ -20,6 +20,8 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let saving = $state(false);
+	/** When the last explicit save LANDED — feeds the editor's polite status line. */
+	let lastSavedAtMs = $state<number | null>(null);
 	let issuing = $state(false);
 	let busy = $state(false);
 	let paymentOpen = $state(false);
@@ -55,7 +57,16 @@
 				body: JSON.stringify(payload)
 			});
 
-			if (response.ok) return true;
+			if (response.ok) {
+				// The SERVER's write time, the same rule quoting's SaveState keeps: "All changes
+				// saved" is a claim about the database, so the clock it shows is the database's.
+				// The local clock only steps in if the body cannot be read, which still beats a
+				// saved sentence with no time at all.
+				const body = await response.json().catch(() => null);
+				const savedAt = typeof body?.savedAt === 'string' ? Date.parse(body.savedAt) : NaN;
+				lastSavedAtMs = Number.isNaN(savedAt) ? Date.now() : savedAt;
+				return true;
+			}
 
 			// The endpoint says why in language a person can act on — an unpriced line, an invoice
 			// that has been issued from another tab. A save indicator that quietly stopped
@@ -132,8 +143,10 @@
 			provisionalNumber={data.provisionalNumber}
 			usualDays={data.usualDays}
 			{saving}
+			{lastSavedAtMs}
 			{issuing}
 			message={saveError ?? message}
+			onsaveretry={saveError ? save : undefined}
 			onsave={save}
 			onissue={issue}
 			ondiscard={() => discardForm?.requestSubmit()}
