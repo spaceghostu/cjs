@@ -37,6 +37,25 @@
  * rather than guess" — so an unknown cost is never treated as zero. Zero cost and unknown cost
  * produce the same margin arithmetic and mean opposite things, and only one of them is a claim
  * this product is entitled to make.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * AND LABOUR IS WHAT WAS CHARGED, SAID OUT LOUD
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * There is a third place a cost can come from, and it is the client's own answer to what labour
+ * costs (Q5, 17 Aug 2026): nothing. No rate card, no timesheets — labour is entered per line on
+ * the quote, so the charge is the only labour figure that exists, and an invoice raised from a
+ * quote carries it as the labour cost under source `charged`. Note what that figure IS and is
+ * not: once labour is deducted at its charge, neither "at most" nor "at least" can honestly be
+ * claimed for what is kept — the true cost of the work may sit on either side of what was
+ * charged for it. So `labourNote` states the fact and claims no bound, unlike the unpriced-lines
+ * caveat, which really is an upper bound and says so.
+ *
+ * The visible consequence, chosen and recorded here: a from-quote invoice whose lines were all
+ * typed by hand — none drawn from Inventory — shows Labour equal to the whole subtotal and
+ * "What you keep" of exactly R0,00. That is the arithmetic being honest about a business that
+ * recorded no costs, not a bug; lines picked from Inventory are materials, and stay out of the
+ * labour figure until something snapshots their cost (SPA-23's movements, or a later snapshot
+ * path — deliberately not guessed at here).
  */
 import { subMoney, sumMoney, type Money } from '$lib/core/money';
 
@@ -80,6 +99,12 @@ export type Margin = {
 	readonly totalLines: number;
 	/** Null when every cost is known — nothing to explain. */
 	readonly caveat: string | null;
+	/**
+	 * Null when no cost in the panel is a charge standing in for labour. Otherwise the sentence
+	 * saying what the Labour figure actually is — a statement of fact, not a bound (see the
+	 * header), which is why it renders muted rather than in the caveat's warning colour.
+	 */
+	readonly labourNote: string | null;
 };
 
 /**
@@ -115,6 +140,10 @@ export type CostInput = {
  * the gap; one that has it is told that nothing was recorded — which is a different problem with
  * a different fix, and telling somebody to switch on a module they already pay for is the kind
  * of small wrongness that costs a product its credibility.
+ *
+ * `chargedLabourLines` is required, not defaulted, on purpose: degradation in this file is a
+ * decision, and a caller that never considered whether its labour figures are charges should
+ * not compile.
  */
 export function marginPanel(input: {
 	readonly revenue: Money;
@@ -122,6 +151,8 @@ export function marginPanel(input: {
 	readonly totalLines: number;
 	readonly costedLines: number;
 	readonly inventoryOwned: boolean;
+	/** How many lines were costed at what was charged for them. Decides `labourNote`. */
+	readonly chargedLabourLines: number;
 }): MarginPanel {
 	if (input.costedLines === 0) {
 		return {
@@ -157,7 +188,11 @@ export function marginPanel(input: {
 			caveat:
 				unpricedLines === 0
 					? null
-					: `${unpricedLines} of ${input.totalLines} lines have no cost recorded, so what you keep is at most this.`
+					: `${unpricedLines} of ${input.totalLines} lines have no cost recorded, so what you keep is at most this.`,
+			labourNote:
+				input.chargedLabourLines > 0
+					? "Labour is what you charged for it on the quote — what it actually cost you isn't recorded."
+					: null
 		}
 	};
 }

@@ -86,7 +86,11 @@
 					<dd><Amount value={data.margin.margin.keep} size="md" tone="settled" /></dd>
 				</div>
 			</dl>
-			<p class="mt-3 text-helper text-ink-muted">{marginFootnote(true)}</p>
+			<p class="mt-3 text-helper text-ink-muted">{marginFootnote(data.fromInventory)}</p>
+			{#if data.margin.margin.labourNote}
+				<!-- A qualification, not a warning — muted, never the caveat's amber. -->
+				<p class="mt-1 text-helper text-ink-muted">{data.margin.margin.labourNote}</p>
+			{/if}
 			{#if data.margin.margin.caveat}
 				<p class="mt-1 text-helper text-attention-ink">{data.margin.margin.caveat}</p>
 			{/if}

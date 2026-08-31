@@ -122,8 +122,13 @@ export type InvoiceEventActor = (typeof INVOICE_EVENT_ACTORS)[number];
  * price you paid" is only true if the cost was snapshotted from a stock item at the moment the
  * line was added. `manual` is a cost somebody typed. Null is the honest third answer: nobody
  * knows what this line cost, and the margin panel says so rather than guessing.
+ *
+ * `charged` is the labour answer (Q5, 17 Aug 2026): there is no rate card and no timesheet, so
+ * the quote's charged amount is the only labour figure that exists, and it stands in for a cost
+ * nobody will ever record. It is its own source — never `manual` — so no screen can present a
+ * charge as a recorded cost, and the panel can say plainly that labour is what was charged.
  */
-export const COST_SOURCES = ['inventory', 'manual'] as const;
+export const COST_SOURCES = ['inventory', 'manual', 'charged'] as const;
 
 export type CostSource = (typeof COST_SOURCES)[number];
 

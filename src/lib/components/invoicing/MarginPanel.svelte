@@ -73,6 +73,15 @@
 			</a>
 		</p>
 
+		{#if panel.margin.labourNote}
+			<!--
+				A qualification, not a warning — labour's figure is real, it is just the charge
+				standing in for a cost nobody records. Muted, never the caveat's amber: the
+				sentence states a fact and claims no bound.
+			-->
+			<p class="mt-2 text-helper text-ink-muted">{panel.margin.labourNote}</p>
+		{/if}
+
 		{#if panel.margin.caveat}
 			<!--
 				An upper bound, said out loud. A panel that quietly folded unknown costs into the

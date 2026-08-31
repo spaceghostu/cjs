@@ -57,9 +57,16 @@ export async function marginFor(
 	if (materials && materials.cents !== 0) costs.push({ kind: 'materials', amount: materials });
 	if (labour && labour.cents !== 0) costs.push({ kind: 'labour', amount: labour });
 
-	const { total, costed } = await lineCounts(tx, invoiceId);
+	const { total, costed, charged } = await lineCounts(tx, invoiceId);
 
-	return marginPanel({ revenue, costs, totalLines: total, costedLines: costed, inventoryOwned });
+	return marginPanel({
+		revenue,
+		costs,
+		totalLines: total,
+		costedLines: costed,
+		inventoryOwned,
+		chargedLabourLines: charged
+	});
 }
 
 /**
@@ -69,17 +76,24 @@ export async function marginFor(
  * why. Counted from the lines rather than from the postings, because a line with no cost posts
  * nothing at all — which is the point, and also the reason the postings alone cannot tell you
  * how much is missing.
+ *
+ * `charged` counts the lines whose cost is the quote's charged amount standing in for labour.
+ * It decides only a sentence — the labour figure itself still comes off `core_posting`.
  */
-async function lineCounts(tx: Tx, invoiceId: string): Promise<{ total: number; costed: number }> {
+async function lineCounts(
+	tx: Tx,
+	invoiceId: string
+): Promise<{ total: number; costed: number; charged: number }> {
 	const [row] = await tx
 		.select({
 			total: sql<number>`count(*)::int`,
-			costed: sql<number>`count(*) filter (where ${invoiceLine.costMicros} is not null)::int`
+			costed: sql<number>`count(*) filter (where ${invoiceLine.costMicros} is not null)::int`,
+			charged: sql<number>`count(*) filter (where ${invoiceLine.costSource} = 'charged')::int`
 		})
 		.from(invoiceLine)
 		.where(and(eq(invoiceLine.invoiceId, invoiceId), isNull(invoiceLine.archivedAt)));
 
-	return { total: row?.total ?? 0, costed: row?.costed ?? 0 };
+	return { total: row?.total ?? 0, costed: row?.costed ?? 0, charged: row?.charged ?? 0 };
 }
 
 /** Did any of the costs actually come from Inventory? Decides the footnote's wording. */

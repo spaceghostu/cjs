@@ -439,7 +439,8 @@ describe('the margin panel', () => {
 			],
 			totalLines: 3,
 			costedLines: 3,
-			inventoryOwned: true
+			inventoryOwned: true,
+			chargedLabourLines: 0
 		});
 
 		expect(panel.known).toBe(true);
@@ -458,7 +459,8 @@ describe('the margin panel', () => {
 			costs: [{ kind: 'materials', amount: money(1_428_000, ZAR) }],
 			totalLines: 3,
 			costedLines: 1,
-			inventoryOwned: true
+			inventoryOwned: true,
+			chargedLabourLines: 0
 		});
 
 		expect(panel.known).toBe(true);
@@ -474,7 +476,8 @@ describe('the margin panel', () => {
 			costs: [],
 			totalLines: 3,
 			costedLines: 0,
-			inventoryOwned: false
+			inventoryOwned: false,
+			chargedLabourLines: 0
 		});
 
 		expect(panel.known).toBe(false);
@@ -489,7 +492,8 @@ describe('the margin panel', () => {
 			costs: [],
 			totalLines: 3,
 			costedLines: 0,
-			inventoryOwned: true
+			inventoryOwned: true,
+			chargedLabourLines: 0
 		});
 
 		expect(panel.known).toBe(false);
@@ -504,13 +508,70 @@ describe('the margin panel', () => {
 			costs: [{ kind: 'materials', amount: money(1_000_000, ZAR) }],
 			totalLines: 1,
 			costedLines: 1,
-			inventoryOwned: true
+			inventoryOwned: true,
+			chargedLabourLines: 0
 		});
 
 		expect(panel.known).toBe(true);
 		if (!panel.known) return;
 		expect(panel.margin.costs).toHaveLength(1);
 		expect(panel.margin.costs[0].kind).toBe('materials');
+	});
+
+	it('says labour is the charge when any line was costed at what was charged', () => {
+		const panel = marginPanel({
+			revenue,
+			costs: [{ kind: 'labour', amount: money(2_100_000, ZAR) }],
+			totalLines: 3,
+			costedLines: 3,
+			inventoryOwned: true,
+			chargedLabourLines: 3
+		});
+
+		expect(panel.known).toBe(true);
+		if (!panel.known) return;
+		expect(panel.margin.labourNote).toBe(
+			"Labour is what you charged for it on the quote — what it actually cost you isn't recorded."
+		);
+		// The column still adds up: everything charged as labour leaves exactly nothing.
+		expect(rands(panel.margin.keep)).toBe('R0,00');
+		expect(panel.margin.caveat).toBeNull();
+	});
+
+	it('says nothing about labour when no line was costed at charge', () => {
+		const panel = marginPanel({
+			revenue,
+			costs: [{ kind: 'materials', amount: money(1_428_000, ZAR) }],
+			totalLines: 3,
+			costedLines: 3,
+			inventoryOwned: true,
+			chargedLabourLines: 0
+		});
+
+		expect(panel.known).toBe(true);
+		if (!panel.known) return;
+		expect(panel.margin.labourNote).toBeNull();
+	});
+
+	it('lets the labour note and the upper-bound caveat stand together', () => {
+		// A real production shape: hand-typed lines costed at charge, one line drawn from
+		// Inventory with no cost snapshot yet. Both sentences are true; both are shown.
+		const panel = marginPanel({
+			revenue,
+			costs: [{ kind: 'labour', amount: money(1_400_000, ZAR) }],
+			totalLines: 3,
+			costedLines: 2,
+			inventoryOwned: true,
+			chargedLabourLines: 2
+		});
+
+		expect(panel.known).toBe(true);
+		if (!panel.known) return;
+		expect(panel.margin.labourNote).toContain('what you charged');
+		expect(panel.margin.caveat).toBe(
+			'1 of 3 lines have no cost recorded, so what you keep is at most this.'
+		);
+		expect(rands(panel.margin.keep)).toBe('R7 000,00');
 	});
 });
 

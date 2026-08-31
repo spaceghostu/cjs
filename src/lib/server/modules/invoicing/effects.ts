@@ -32,7 +32,12 @@ import { invoice, invoiceLine, invoicePayment } from '$lib/server/core/db/schema
 import { toMoney, type Business } from '$lib/server/core/db/map';
 import type { Tx } from '$lib/server/core/db/tx';
 import { recordEvent } from './events';
-import { postPaymentReceived, postPaymentReversed, postInvoiceCancelled } from './ledger';
+import {
+	chargedLabourCost,
+	postPaymentReceived,
+	postPaymentReversed,
+	postInvoiceCancelled
+} from './ledger';
 import { loadInvoiceRow, loadPayments, loadSettings } from './queries';
 
 /**
@@ -189,21 +194,38 @@ export async function createFromQuote(
 
 	if (source.lines.length > 0) {
 		await tx.insert(invoiceLine).values(
-			source.lines.map((line) => ({
-				businessId: business.id,
-				invoiceId: row.id,
-				position: line.position,
-				description: line.description,
-				provenance: line.provenance,
-				documentDescription: line.documentDescription,
-				qtyE6: line.qtyE6,
-				unitPriceMicros: line.unitPriceMicros,
-				currency: source.currency,
-				taxTreatment: line.taxTreatment,
-				vatRatePpm: line.vatRatePpm,
-				sourceItemId: line.sourceItemId,
-				sourceCapturedAt: line.sourceItemId ? now : null
-			}))
+			source.lines.map((line) => {
+				/*
+				 * THE LABOUR COST IS THE CHARGE — Q5 (17 Aug 2026). Labour is entered per line on
+				 * the quote with no rate card and no timesheets behind it, so the charge is the
+				 * only labour figure that exists, and it is snapshotted here as the line's cost.
+				 * Written as `charged`, never `manual`, so no screen presents it as a recorded
+				 * cost; the margin panel says out loud that labour is what was charged. A line
+				 * picked from Inventory is left fully uncosted instead — its cost is Inventory's
+				 * to record when movements land (SPA-23), and pricing it at the charge here would
+				 * be the guess this design refuses. All three cost columns travel together, as
+				 * `cost_complete` demands.
+				 */
+				const charged = chargedLabourCost(line);
+				return {
+					businessId: business.id,
+					invoiceId: row.id,
+					position: line.position,
+					description: line.description,
+					provenance: line.provenance,
+					documentDescription: line.documentDescription,
+					qtyE6: line.qtyE6,
+					unitPriceMicros: line.unitPriceMicros,
+					currency: source.currency,
+					taxTreatment: line.taxTreatment,
+					vatRatePpm: line.vatRatePpm,
+					sourceItemId: line.sourceItemId,
+					sourceCapturedAt: line.sourceItemId ? now : null,
+					...(charged !== null
+						? { costMicros: charged, costSource: 'charged' as const, costCapturedAt: now }
+						: {})
+				};
+			})
 		);
 	}
 
@@ -447,6 +469,8 @@ async function reconcileLines(
 			})
 			.onConflictDoUpdate({
 				target: invoiceLine.id,
+				// No cost column in this set-list, on purpose: a later price edit does not move a
+				// `charged` snapshot — the quote is the document the labour figure was entered on.
 				set: {
 					position: line.position,
 					description: line.description,
